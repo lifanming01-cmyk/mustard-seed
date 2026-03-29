@@ -1,0 +1,3694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>芥子 - Mustard Seed Enhanced</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #f0f2f5; overflow: hidden; font-family: 'Courier New', monospace; }
+#gameCanvas { display: block; cursor: crosshair; touch-action: none; -webkit-touch-callout: none; }
+
+/* Start Overlay - transparent, floats over the live canvas */
+#startOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  pointer-events: none;
+  background: rgba(232,236,242,0.45);
+  backdrop-filter: blur(2px);
+  transition: opacity 0.8s ease-out, backdrop-filter 0.8s ease-out;
+}
+#startOverlay.hidden {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  pointer-events: none;
+}
+#startContent {
+  text-align: center;
+  pointer-events: auto;
+  animation: floatIn 1.5s ease-out;
+}
+@keyframes floatIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+#titleEnglish {
+  font-size: 80px; font-weight: bold; color: #2a5a8c;
+  text-shadow: 0 2px 20px rgba(42,90,140,0.35), 0 0 40px rgba(42,90,140,0.15);
+  letter-spacing: 8px; animation: glow 3s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,100% { text-shadow: 0 2px 20px rgba(42,90,140,0.35), 0 0 40px rgba(42,90,140,0.15); }
+  50% { text-shadow: 0 2px 30px rgba(42,90,140,0.5), 0 0 60px rgba(42,90,140,0.3); }
+}
+#titleChinese { font-size: 36px; color: rgba(42,60,90,0.65); letter-spacing: 16px; margin: 10px 0 30px; }
+#startButton {
+  background: linear-gradient(135deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4));
+  border: 2px solid rgba(42,90,140,0.45); color: #2a5a8c; font-size: 24px;
+  padding: 18px 56px; border-radius: 50px; cursor: pointer;
+  font-family: 'Courier New', monospace; letter-spacing: 4px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(42,90,140,0.12);
+}
+#startButton:hover {
+  background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.6));
+  border-color: #2a5a8c; transform: scale(1.05);
+  box-shadow: 0 6px 30px rgba(42,90,140,0.2);
+}
+
+/* HUD - unified panel with natural flow layout */
+#ui {
+  position: absolute; top: 20px; left: 20px; color: rgba(30,50,80,0.85);
+  pointer-events: none; user-select: none; width: 340px;
+  background: rgba(255,255,255,0.75); padding: 16px 22px; border-radius: 12px;
+  backdrop-filter: blur(8px); border: 1px solid rgba(42,90,140,0.15);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  display: none;
+}
+#ui.visible { display: block; }
+#ui h1 { font-size: 22px; color: #1a3a5c; text-shadow: none; line-height: 1.3; margin: 0; }
+#ui .desc { margin: 4px 0 0; font-size: 14px; color: rgba(50,70,100,0.6); }
+#ui .stats { margin-top: 10px; font-size: 15px; color: rgba(40,60,90,0.65); display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }
+#ui .stats span.val { color: #1a7a9c; font-weight: bold; }
+#ui .stats span.val-red { color: #c44040; font-weight: bold; }
+
+/* Energy section - inside #ui, separated by a divider */
+#energySection {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(42,90,140,0.1);
+}
+#energyLabel { color: rgba(40,60,90,0.55); font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; }
+#energyBarBg {
+  width: 100%; height: 24px; background: rgba(42,90,140,0.06);
+  border: 1px solid rgba(42,90,140,0.15); border-radius: 12px;
+  overflow: hidden; position: relative; margin-top: 6px;
+}
+#energyBar {
+  height: 100%; background: linear-gradient(90deg, #3a9ac0, #2a7aaa); width: 0%;
+  transition: width 0.3s ease; box-shadow: 0 0 10px rgba(42,130,180,0.3); border-radius: 11px;
+}
+#energyText {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  color: #1a3a5c; font-size: 13px; text-shadow: 0 0 4px rgba(255,255,255,0.6); font-weight: bold;
+}
+
+/* Skill Bar */
+#skillBar {
+  position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+  display: none; gap: 14px; pointer-events: none;
+}
+#skillBar.visible { display: flex; }
+.skill-slot {
+  width: 66px; height: 66px; border: 2px solid rgba(42,90,140,0.3);
+  border-radius: 14px; background: rgba(255,255,255,0.7); position: relative;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.skill-slot .key { position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: #2a5a8c; background: rgba(255,255,255,0.9);
+  padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(42,90,140,0.2); }
+.skill-slot .icon { font-size: 28px; }
+.skill-slot .cd-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(200,210,220,0.75); border-radius: 12px;
+  display: none; align-items: center; justify-content: center;
+  color: #3a5a80; font-size: 15px; font-weight: bold;
+}
+.skill-slot.on-cd .cd-overlay { display: flex; }
+.skill-slot.on-cd { border-color: rgba(100,120,150,0.3); }
+
+/* Minimap */
+#minimap {
+  position: absolute; bottom: 20px; right: 20px; width: 200px; height: 200px;
+  background: rgba(255,255,255,0.6); border: 1px solid rgba(42,90,140,0.15);
+  border-radius: 12px; backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  display: none;
+}
+#minimap.visible { display: block; }
+
+/* Info panel */
+#info {
+  position: absolute; bottom: 20px; left: 20px;
+  color: rgba(40,60,90,0.55); font-size: 14px;
+  background: rgba(255,255,255,0.65); padding: 12px 18px; border-radius: 12px;
+  backdrop-filter: blur(8px); line-height: 2;
+  border: 1px solid rgba(42,90,140,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: none;
+}
+#info.visible { display: block; }
+
+/* Evolution flash */
+.evo-flash {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(42,130,180,0.25), transparent);
+  pointer-events: none; z-index: 500;
+  animation: evoFlash 0.8s ease-out forwards;
+}
+@keyframes evoFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Game Over / Win overlay */
+.overlay-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 900; animation: fadeIn 0.5s ease-in;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.overlay-screen .panel {
+  text-align: center; padding: 50px 70px; border-radius: 20px;
+  backdrop-filter: blur(12px); border: 1px solid rgba(42,90,140,0.15);
+  background: rgba(255,255,255,0.88);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+}
+.overlay-screen h2 { font-size: 48px; margin-bottom: 24px; letter-spacing: 4px; }
+.overlay-screen .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 36px;
+  font-size: 18px; margin: 24px 0; text-align: left; }
+.overlay-screen .stat-grid .label { color: rgba(40,60,90,0.5); }
+.overlay-screen .stat-grid .value { color: #1a7a9c; text-align: right; }
+.overlay-screen button {
+  margin-top: 30px; background: linear-gradient(135deg, rgba(42,90,140,0.12), rgba(60,130,200,0.12));
+  border: 2px solid rgba(42,90,140,0.45); color: #2a5a8c; font-size: 22px;
+  padding: 14px 48px; border-radius: 36px; cursor: pointer;
+  font-family: 'Courier New', monospace; letter-spacing: 3px; transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(42,90,140,0.1);
+}
+.overlay-screen button:hover { background: rgba(42,90,140,0.18); transform: scale(1.05); }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<!-- Start overlay - transparent, floating over live canvas -->
+<div id="startOverlay">
+  <div id="startContent">
+    <div id="titleEnglish">MUSTARD SEED</div>
+    <div id="titleChinese">芥 子</div>
+    <button id="startButton">开始游戏</button>
+  </div>
+</div>
+
+<div id="ui">
+  <h1 id="speciesName">I. Photon (光子)</h1>
+  <div class="desc" id="speciesDesc">微尘级 - 神经质的高频移动</div>
+  <div class="stats">
+    <div>玩家生物: <span class="val" id="creatureCount">1</span></div>
+    <div>AI生物: <span class="val-red" id="aiCount">0</span></div>
+    <div>击杀: <span class="val" id="killCount">0</span></div>
+    <div>存活: <span class="val" id="survivalTime">0:00</span></div>
+  </div>
+  <div id="energySection">
+    <div id="energyLabel">进化能量</div>
+    <div id="energyBarBg">
+      <div id="energyBar"></div>
+      <div id="energyText">阶段 1/5 - 0 / 25</div>
+    </div>
+  </div>
+</div>
+
+<div id="skillBar">
+  <div class="skill-slot" id="skill-q">
+    <span class="key">Q</span>
+    <span class="icon" id="skillIcon">⚡</span>
+    <div class="cd-overlay" id="skillCd">0</div>
+  </div>
+  <div class="skill-slot" id="skill-space">
+    <span class="key">Space</span>
+    <span class="icon">💨</span>
+    <div class="cd-overlay" id="dashCd">0</div>
+  </div>
+</div>
+
+<canvas id="minimap" width="200" height="200"></canvas>
+
+<div id="info">
+  <div>🖱️ 鼠标移动 · ✨ 吸收粒子 · Q 技能 · Space 闪避</div>
+</div>
+
+<script>
+// ============================================================
+// Mustard Seed Enhanced - Audio Manager (Web Audio API)
+// ============================================================
+class AudioManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+    this.masterGain = null;
+    this.initialized = false;
+  }
+
+  init() {
+    if (this.initialized) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.3;
+      this.masterGain.connect(this.ctx.destination);
+      this.initialized = true;
+    } catch (e) {
+      this.enabled = false;
+    }
+  }
+
+  _playTone(freq, duration, type = 'sine', volume = 0.3, detune = 0) {
+    if (!this.enabled || !this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = detune;
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  }
+
+  eatParticle() {
+    this._playTone(800 + Math.random() * 400, 0.08, 'sine', 0.1);
+  }
+
+  killCreature() {
+    this._playTone(200, 0.3, 'sawtooth', 0.2);
+    setTimeout(() => this._playTone(150, 0.2, 'sawtooth', 0.15), 100);
+  }
+
+  advanceStage() {
+    this._playTone(523, 0.15, 'sine', 0.3);
+    setTimeout(() => this._playTone(659, 0.15, 'sine', 0.3), 120);
+    setTimeout(() => this._playTone(784, 0.3, 'sine', 0.3), 240);
+  }
+
+  evolve() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((n, i) => {
+      setTimeout(() => this._playTone(n, 0.4, 'sine', 0.35), i * 150);
+    });
+  }
+
+  useSkill() {
+    this._playTone(1200, 0.15, 'square', 0.15);
+    this._playTone(1600, 0.1, 'square', 0.1);
+  }
+
+  dash() {
+    this._playTone(300, 0.15, 'sawtooth', 0.15);
+    this._playTone(600, 0.1, 'sine', 0.1);
+  }
+
+  danger() {
+    this._playTone(200, 0.2, 'square', 0.2);
+    setTimeout(() => this._playTone(180, 0.2, 'square', 0.2), 200);
+  }
+
+  gameOver() {
+    const notes = [400, 350, 300, 200];
+    notes.forEach((n, i) => {
+      setTimeout(() => this._playTone(n, 0.5, 'sine', 0.3), i * 200);
+    });
+  }
+
+  victory() {
+    const notes = [523, 659, 784, 1047, 1319, 1568];
+    notes.forEach((n, i) => {
+      setTimeout(() => this._playTone(n, 0.4, 'sine', 0.3), i * 120);
+    });
+  }
+}
+
+window.AudioMgr = new AudioManager();
+// ============================================================
+// Mustard Seed Enhanced - Spatial Hash Grid
+// ============================================================
+class SpatialHash {
+  constructor(cellSize) {
+    this.cellSize = cellSize;
+    this.grid = new Map();
+  }
+
+  clear() {
+    this.grid.clear();
+  }
+
+  _key(x, y) {
+    const cx = Math.floor(x / this.cellSize);
+    const cy = Math.floor(y / this.cellSize);
+    return (cx * 73856093) ^ (cy * 19349663); // hash
+  }
+
+  insert(obj) {
+    const key = this._key(obj.x, obj.y);
+    if (!this.grid.has(key)) this.grid.set(key, []);
+    this.grid.get(key).push(obj);
+  }
+
+  query(x, y, radius) {
+    const results = [];
+    const minCx = Math.floor((x - radius) / this.cellSize);
+    const maxCx = Math.floor((x + radius) / this.cellSize);
+    const minCy = Math.floor((y - radius) / this.cellSize);
+    const maxCy = Math.floor((y + radius) / this.cellSize);
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const key = (cx * 73856093) ^ (cy * 19349663);
+        const cell = this.grid.get(key);
+        if (cell) {
+          for (let i = 0; i < cell.length; i++) {
+            results.push(cell[i]);
+          }
+        }
+      }
+    }
+    return results;
+  }
+}
+// ============================================================
+// Mustard Seed Enhanced - Chain Physics (body segments)
+// ============================================================
+class Segment {
+  constructor(x, y, radius) {
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.angle = 0;
+  }
+}
+
+class Chain {
+  constructor(count, distance, radiusStart, radiusEnd, stiffness = 0.6) {
+    this.segments = [];
+    this.distance = distance;
+    this.stiffness = stiffness;
+    for (let i = 0; i < count; i++) {
+      const t = count > 1 ? i / (count - 1) : 0;
+      const r = radiusStart + (radiusEnd - radiusStart) * t;
+      this.segments.push(new Segment(0, 0, r));
+    }
+  }
+
+  update(hx, hy) {
+    const s = this.segments;
+    s[0].x = hx;
+    s[0].y = hy;
+    for (let i = 1; i < s.length; i++) {
+      const prev = s[i - 1];
+      const cur = s[i];
+      const dx = prev.x - cur.x;
+      const dy = prev.y - cur.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const ang = Math.atan2(dy, dx);
+      cur.angle = ang;
+      if (dist > 0) {
+        const tx = prev.x - Math.cos(ang) * this.distance;
+        const ty = prev.y - Math.sin(ang) * this.distance;
+        cur.x += (tx - cur.x) * this.stiffness;
+        cur.y += (ty - cur.y) * this.stiffness;
+        // max stretch limit
+        const ndx = prev.x - cur.x;
+        const ndy = prev.y - cur.y;
+        const nd = Math.sqrt(ndx * ndx + ndy * ndy);
+        const maxD = this.distance * 2;
+        if (nd > maxD) {
+          const a2 = Math.atan2(ndy, ndx);
+          cur.x = prev.x - Math.cos(a2) * maxD;
+          cur.y = prev.y - Math.sin(a2) * maxD;
+        }
+      }
+    }
+  }
+
+  draw(ctx, color, width = 2) {
+    if (this.segments.length === 0) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(this.segments[0].x, this.segments[0].y);
+    for (let i = 1; i < this.segments.length; i++) {
+      ctx.lineTo(this.segments[i].x, this.segments[i].y);
+    }
+    ctx.stroke();
+  }
+}
+// ============================================================
+// Mustard Seed Enhanced - Creature Base Class
+// ============================================================
+
+class Creature {
+  constructor(x, y, type, config, isAI = false) {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    this.config = config;
+    this.isAI = isAI;
+    if (!isAI) {
+      this.playerColor = '#1a7a9c';
+      this.playerGlow = '#2a9abd';
+    }
+    this.angle = 0;
+    this.timer = 0;
+    this.velocity = { x: 0, y: 0 };
+    this.scale = 1;
+    this.flockId = 0;
+    this.groupId = isAI ? Math.random() : 'player';
+    this.complexityStage = 0;
+
+    // Attack
+    this.attackPhase = 0;
+    this.isAttacking = false;
+
+    // Hunting
+    this.isHunting = false;
+    this.huntTimer = 0;
+    this.huntCooldownTimer = 0;
+
+    // Chains & collision
+    this.chains = [];
+    this.props = {};
+    this.centerCollision = null;
+
+    // Death
+    this.isDying = false;
+    this.deathProgress = 0;
+
+    // Birth freeze
+    this.isFrozen = true;
+    this.frozenTimer = 6;
+
+    // AI evolution
+    if (isAI) {
+      this.energy = 0;
+      this.evolutionStage = 0;
+    }
+
+    // Wander
+    this.wanderAngle = Math.random() * Math.PI * 2;
+    this.wanderTimer = 0;
+
+    // Dash (player only)
+    this.isDashing = false;
+    this.dashTimer = 0;
+    this.dashCooldown = 0;
+    this.dashDirX = 0;
+    this.dashDirY = 0;
+
+    // Skill (player only)
+    this.skillCooldown = 0;
+
+    // Invulnerability frames
+    this.invulnTimer = 0;
+
+    // Upgrading state
+    this.isUpgrading = false;
+
+    this.setupCreature();
+  }
+
+  setupCreature() { /* Override in subclass */ }
+
+  getColor() {
+    if (this.isDying) return 'rgba(255,255,255,' + (1 - this.deathProgress) + ')';
+    if (this.invulnTimer > 0 && Math.floor(this.invulnTimer * 10) % 2 === 0) return 'rgba(255,255,255,0.3)';
+    return this.isAI ? this.config.color : this.playerColor;
+  }
+
+  getGlowColor() {
+    return this.isAI ? this.config.glow : this.playerGlow;
+  }
+
+  getGlowIntensity() {
+    return this.isHunting ? 20 : 10;
+  }
+
+  getStateAlpha() {
+    if (this.isDying) return Math.max(0, 1 - this.deathProgress);
+    if (this.isFrozen) return 0.4;
+    return 1;
+  }
+
+  update(tx, ty, isAttacking, worldSize, particles) {
+    this.timer++;
+
+    if (this.isDying) {
+      this.deathProgress = Math.min(this.deathProgress + 0.03, 1);
+      return [];
+    }
+
+    if (this.isFrozen) {
+      this.frozenTimer--;
+      if (this.frozenTimer <= 0) this.isFrozen = false;
+      this.updateChains();
+      return [];
+    }
+
+    if (this.invulnTimer > 0) this.invulnTimer -= 1 / 60;
+
+    // Hunting state
+    if (this.isHunting) {
+      this.huntTimer++;
+      const dur = this.config.huntDuration || 180;
+      if (this.huntTimer >= dur) {
+        this.isHunting = false;
+        this.huntTimer = 0;
+        this.huntCooldownTimer = this.config.huntCooldown || 300;
+      }
+    } else if (this.huntCooldownTimer > 0) {
+      this.huntCooldownTimer--;
+    }
+
+    // Attack anim
+    if (this.isAttacking) {
+      this.attackPhase += 0.08;
+      if (this.attackPhase >= 1) {
+        this.attackPhase = 0;
+        this.isAttacking = false;
+      }
+    } else {
+      this.attackPhase = 0;
+    }
+
+    // Dash
+    if (this.isDashing) {
+      this.dashTimer--;
+      if (this.dashTimer <= 0) this.isDashing = false;
+    }
+    if (this.dashCooldown > 0) this.dashCooldown--;
+    if (this.skillCooldown > 0) this.skillCooldown--;
+
+    // Eat particles
+    let eaten = [];
+    if (!this.isAttacking) {
+      eaten = this.detectAndEatParticles(particles);
+      if (eaten.length > 0) {
+        this.isAttacking = true;
+        this.attackPhase = 0;
+      }
+    }
+
+    this.updateChains();
+    return eaten;
+  }
+
+  updateChains() { /* Override */ }
+
+  detectAndEatParticles(particles) {
+    const eaten = [];
+    if (this.chains.length === 0 && !this.centerCollision) return eaten;
+
+    for (let idx = particles.length - 1; idx >= 0; idx--) {
+      const p = particles[idx];
+      if (!p || p.invulnerable || p._eaten) continue;
+
+      let hit = false;
+      // Check center collision
+      if (this.centerCollision) {
+        const dx = p.x - this.centerCollision.x;
+        const dy = p.y - this.centerCollision.y;
+        const r = this.centerCollision.radius + (p.size || 2);
+        if (dx * dx + dy * dy < r * r) hit = true;
+      }
+
+      // Check chain segments
+      if (!hit) {
+        for (let c = 0; c < this.chains.length && !hit; c++) {
+          const segs = this.chains[c].segments;
+          const step = Math.max(1, Math.floor(segs.length / 8));
+          for (let s = 0; s < segs.length; s += step) {
+            const seg = segs[s];
+            const dx = p.x - seg.x;
+            const dy = p.y - seg.y;
+            const r = (seg.radius || 5) + (p.size || 2);
+            if (dx * dx + dy * dy < r * r) {
+              hit = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (hit) {
+        p._eaten = true;
+        eaten.push(p);
+      }
+    }
+    return eaten;
+  }
+
+  detectAndAttackCreatures(targets) {
+    if (this.chains.length === 0 && !this.centerCollision) return null;
+    const range = 500 * (this.scale || 1);
+    const rangeSq = range * range;
+
+    for (const target of targets) {
+      if (target === this || target.groupId === this.groupId) continue;
+      if (target.invulnTimer > 0) continue;
+
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      if (dx * dx + dy * dy > rangeSq) continue;
+
+      if (this._checkCollision(target)) return target;
+    }
+    return null;
+  }
+
+  _checkCollision(other) {
+    // Center vs center
+    if (this.centerCollision && other.centerCollision) {
+      const dx = other.centerCollision.x - this.centerCollision.x;
+      const dy = other.centerCollision.y - this.centerCollision.y;
+      const r = this.centerCollision.radius + other.centerCollision.radius;
+      if (dx * dx + dy * dy < r * r) return true;
+    }
+
+    // Center vs chains
+    if (this.centerCollision && other.chains.length > 0) {
+      for (const chain of other.chains) {
+        const step = Math.max(1, Math.floor(chain.segments.length / 6));
+        for (let i = 0; i < chain.segments.length; i += step) {
+          const seg = chain.segments[i];
+          const dx = seg.x - this.centerCollision.x;
+          const dy = seg.y - this.centerCollision.y;
+          const r = this.centerCollision.radius + (seg.radius || 10);
+          if (dx * dx + dy * dy < r * r) return true;
+        }
+      }
+    }
+
+    // Chains vs center
+    if (other.centerCollision && this.chains.length > 0) {
+      for (const chain of this.chains) {
+        const step = Math.max(1, Math.floor(chain.segments.length / 6));
+        for (let i = 0; i < chain.segments.length; i += step) {
+          const seg = chain.segments[i];
+          const dx = other.centerCollision.x - seg.x;
+          const dy = other.centerCollision.y - seg.y;
+          const r = (seg.radius || 10) + other.centerCollision.radius;
+          if (dx * dx + dy * dy < r * r) return true;
+        }
+      }
+    }
+
+    // Chains vs chains (sparse)
+    if (this.chains.length > 0 && other.chains.length > 0) {
+      for (const c1 of this.chains) {
+        const step1 = Math.max(1, Math.floor(c1.segments.length / 4));
+        for (let i = 0; i < c1.segments.length; i += step1) {
+          const s1 = c1.segments[i];
+          for (const c2 of other.chains) {
+            const step2 = Math.max(1, Math.floor(c2.segments.length / 4));
+            for (let j = 0; j < c2.segments.length; j += step2) {
+              const s2 = c2.segments[j];
+              const dx = s2.x - s1.x;
+              const dy = s2.y - s1.y;
+              const r = (s1.radius || 5) + (s2.radius || 5);
+              if (dx * dx + dy * dy < r * r) return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  startDeath() {
+    if (this.isDying) return [];
+    this.isDying = true;
+    this.deathProgress = 0;
+    const particles = [];
+    const sc = this.scale || 1;
+    this.chains.forEach(chain => {
+      chain.segments.forEach(seg => {
+        const count = Math.max(2, Math.ceil(seg.radius / 1.5));
+        const spread = Math.max(5, seg.radius);
+        for (let i = 0; i < count; i++) {
+          particles.push({
+            x: seg.x + (Math.random() - 0.5) * spread,
+            y: seg.y + (Math.random() - 0.5) * spread,
+            size: (Math.random() * 3 + 1.5) * sc,
+            energy: Math.ceil(sc),
+            vx: (Math.random() - 0.5) * 0.8,
+            vy: (Math.random() - 0.5) * 0.8
+          });
+        }
+      });
+    });
+    return particles;
+  }
+
+  isDeathComplete() {
+    return this.isDying && this.deathProgress >= 1;
+  }
+
+  getBounds() {
+    let minX = this.x, maxX = this.x, minY = this.y, maxY = this.y;
+    this.chains.forEach(c => {
+      c.segments.forEach(s => {
+        if (s.x - s.radius < minX) minX = s.x - s.radius;
+        if (s.x + s.radius > maxX) maxX = s.x + s.radius;
+        if (s.y - s.radius < minY) minY = s.y - s.radius;
+        if (s.y + s.radius > maxY) maxY = s.y + s.radius;
+      });
+    });
+    return { minX, maxX, minY, maxY };
+  }
+
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+  }
+
+  draw(ctx) { /* Override */ }
+}
+// ============================================================
+// Species I: Photon (光子) - Tiny, fast, twitchy
+// ============================================================
+class Photon extends Creature {
+  setupCreature() {
+    this.chains.push(new Chain(4, 5, 6, 1, 0.8));
+  }
+  updateChains() {
+    this.chains[0].update(this.x, this.y);
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    const seg = this.chains[0].segments[0];
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    ctx.fillStyle = this.getColor();
+    const r = 4 + Math.random() * 2 + this.attackPhase * 10 + (this.isHunting ? 3 : 0);
+    ctx.beginPath();
+    ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (this.isHunting) {
+      const p = (this.huntTimer % 30) / 30;
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = (1 - p) * 0.5 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.arc(seg.x, seg.y, r + p * 15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = this.getStateAlpha();
+    }
+    this.chains[0].draw(ctx, this.getColor(), 2);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species II: Dart (飞梭) - Stiff dart with thrust
+// ============================================================
+class Dart extends Creature {
+  setupCreature() {
+    this.chains.push(new Chain(8, 8, 10, 2, 0.9));
+    this.thrustAngle = 0;
+    this.thrustDistance = 0;
+  }
+  updateChains() {
+    if (this.attackPhase > 0) {
+      if (this.attackPhase < 0.1) this.thrustAngle = this.angle;
+      let target = 0;
+      if (this.attackPhase < 0.3) target = (this.attackPhase / 0.3) * 25;
+      else if (this.attackPhase < 0.6) target = 25;
+      else target = 25 * (1 - (this.attackPhase - 0.6) / 0.4);
+      this.thrustDistance += (target - this.thrustDistance) * 0.3;
+    } else {
+      this.thrustDistance *= 0.8;
+    }
+    const hx = this.x + Math.cos(this.thrustAngle) * this.thrustDistance;
+    const hy = this.y + Math.sin(this.thrustAngle) * this.thrustDistance;
+    this.chains[0].update(hx, hy);
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    const seg0 = this.chains[0].segments[0];
+    const chain = this.chains[0];
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(seg0.x, seg0.y);
+    for (let i = 1; i < chain.segments.length; i++) {
+      ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
+    }
+    ctx.stroke();
+    // Head dart shape
+    for (let i = 1; i < Math.min(4, chain.segments.length); i++) {
+      const s = chain.segments[i];
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = this.getColor();
+      ctx.fill();
+    }
+    // Hunting pulse
+    if (this.isHunting) {
+      const p = (this.huntTimer % 20) / 20;
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = (1 - p) * 0.3 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.arc(seg0.x, seg0.y, 15 + p * 20, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species III: Pulse (水母) - Radial tentacles, pulsing
+// ============================================================
+class Pulse extends Creature {
+  setupCreature() {
+    for (let i = 0; i < 5; i++) {
+      this.chains.push(new Chain(12, 6, 4, 1, 0.4));
+    }
+  }
+  updateChains() {
+    this.centerCollision = { x: this.x, y: this.y, radius: 20 };
+    const pulse = Math.sin(this.timer * 0.1) * 10 * (1 - this.attackPhase) + this.attackPhase * -20;
+    for (let i = 0; i < this.chains.length; i++) {
+      const ang = (Math.PI * 2 / 5) * i + this.timer * 0.02;
+      const tx = this.x + Math.cos(ang) * (20 + pulse);
+      const ty = this.y + Math.sin(ang) * (20 + pulse);
+      this.chains[i].update(tx, ty);
+    }
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    // Bell
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < this.chains.length; i++) {
+      const s = this.chains[i].segments[0];
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    const bellColor = this.getColor();
+    ctx.fillStyle = bellColor.startsWith('#') 
+      ? bellColor + '26'  // hex + alpha (26 = 0.15 * 255 in hex, approx)
+      : bellColor.replace(')', ',0.15)').replace('rgb', 'rgba');
+    ctx.fill();
+    // Tentacles
+    for (let i = 0; i < this.chains.length; i++) {
+      this.chains[i].draw(ctx, this.getColor(), 1.5);
+    }
+    // Center
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species IV: Serpent (蛇刺) - Long sinusoidal body
+// ============================================================
+class Serpent extends Creature {
+  setupCreature() {
+    const segs = 30 + (this.complexityStage || 0) * 3;
+    const dist = 6 + (this.complexityStage || 0) * 2;
+    this.chains.push(new Chain(segs, dist, 14, 3, 0.3));
+  }
+  updateChains() {
+    this.chains[0].update(this.x, this.y);
+  }
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+    const segs = 30 + stage * 3;
+    const dist = 6 + stage * 2;
+    this.chains[0] = new Chain(segs, dist, 14, 3, 0.3);
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    const chain = this.chains[0];
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    // Hunting aura
+    if (this.isHunting) {
+      const p = (this.huntTimer % 20) / 20;
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = (1 - p) * 0.3 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
+      for (let i = 1; i < chain.segments.length; i++) ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
+      ctx.stroke();
+      ctx.globalAlpha = this.getStateAlpha();
+      ctx.strokeStyle = this.getColor();
+    }
+    // Body
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
+    for (let i = 1; i < chain.segments.length; i++) {
+      const s = chain.segments[i];
+      ctx.lineWidth = Math.max(1, 3 * (1 - i / chain.segments.length));
+      ctx.lineTo(s.x, s.y);
+    }
+    ctx.stroke();
+    // Barbs
+    for (let i = 2; i < chain.segments.length; i += 4) {
+      const s = chain.segments[i];
+      const barbLen = s.radius * 1.5 + this.attackPhase * 5;
+      const ang = s.angle + Math.PI / 2;
+      ctx.strokeStyle = this.getColor();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x + Math.cos(ang) * barbLen, s.y + Math.sin(ang) * barbLen);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - Math.cos(ang) * barbLen, s.y - Math.sin(ang) * barbLen);
+      ctx.stroke();
+    }
+    // Head
+    const head = chain.segments[0];
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species V: Pincer (双螯) - Heavy armored, mechanical claws
+// ============================================================
+class Pincer extends Creature {
+  setupCreature() {
+    this.complexityStage = this.complexityStage || 0;
+    this.chains.push(new Chain(10, 8, 20, 5, 0.7)); // body
+    this.chains.push(new Chain(6, 12, 10, 5, 0.85)); // left claw
+    this.chains.push(new Chain(6, 12, 10, 5, 0.85)); // right claw
+    if (this.complexityStage >= 1) {
+      this.chains.push(new Chain(4, 6, 6, 3, 0.9));
+      this.chains.push(new Chain(4, 6, 6, 3, 0.9));
+    }
+  }
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+    this.chains = [];
+    this.setupCreature();
+  }
+  updateChains() {
+    this.chains[0].update(this.x, this.y);
+    const a = this.angle;
+    const spread = 0.3 - this.attackPhase * 0.25;
+    const reach = 70 + this.attackPhase * 30;
+    if (this.chains.length > 1) {
+      this.chains[1].update(this.x + Math.cos(a - spread) * reach, this.y + Math.sin(a - spread) * reach);
+    }
+    if (this.chains.length > 2) {
+      this.chains[2].update(this.x + Math.cos(a + spread) * reach, this.y + Math.sin(a + spread) * reach);
+    }
+    if (this.chains.length > 3) {
+      const sp2 = 0.6 - this.attackPhase * 0.2;
+      const r2 = 50 + this.attackPhase * 20;
+      this.chains[3].update(this.x + Math.cos(a - sp2) * r2, this.y + Math.sin(a - sp2) * r2);
+    }
+    if (this.chains.length > 4) {
+      const sp2 = 0.6 - this.attackPhase * 0.2;
+      const r2 = 50 + this.attackPhase * 20;
+      this.chains[4].update(this.x + Math.cos(a + sp2) * r2, this.y + Math.sin(a + sp2) * r2);
+    }
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 15;
+    ctx.shadowColor = this.getGlowColor();
+    // Body
+    this.chains[0].draw(ctx, this.getColor(), 4);
+    const segs = this.chains[0].segments;
+    for (let i = 0; i < segs.length; i += 2) {
+      ctx.fillStyle = this.getColor();
+      ctx.beginPath();
+      ctx.arc(segs[i].x, segs[i].y, segs[i].radius * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Claws
+    for (let c = 1; c < this.chains.length; c++) {
+      this.chains[c].draw(ctx, this.getColor(), 3);
+      const tip = this.chains[c].segments[0];
+      ctx.fillStyle = this.getColor();
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 5 + this.attackPhase * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species VI: Glider (滑翔者) - Manta-ray like wings
+// ============================================================
+class Glider extends Creature {
+  setupCreature() {
+    this.complexityStage = this.complexityStage || 0;
+    this.props.wavePhase = 0;
+    this.chains.push(new Chain(25, 8, 0, 0, 0.5)); // spine
+    const wings = Math.min(this.complexityStage + 1, 3);
+    for (let i = 0; i < wings; i++) {
+      this.chains.push(new Chain(20 - i * 2, 8, 0, 0, 0.5)); // left
+      this.chains.push(new Chain(20 - i * 2, 8, 0, 0, 0.5)); // right
+    }
+  }
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+    this.chains = [];
+    this.setupCreature();
+  }
+  updateChains() {
+    this.props.wavePhase += 0.08;
+    this.chains[0].update(this.x, this.y);
+    const wings = Math.min(this.complexityStage + 1, 3);
+    for (let i = 0; i < wings; i++) {
+      const offset = 35 + i * 15;
+      const wave = Math.sin(this.props.wavePhase + i * 0.5) * 15;
+      const li = 1 + i * 2;
+      const ri = 2 + i * 2;
+      if (this.chains[li]) {
+        this.chains[li].update(
+          this.x + Math.cos(this.angle - Math.PI / 2) * offset,
+          this.y + Math.sin(this.angle - Math.PI / 2) * offset + wave
+        );
+      }
+      if (this.chains[ri]) {
+        this.chains[ri].update(
+          this.x + Math.cos(this.angle + Math.PI / 2) * offset,
+          this.y + Math.sin(this.angle + Math.PI / 2) * offset + wave
+        );
+      }
+    }
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity();
+    ctx.shadowColor = this.getGlowColor();
+    // Wings as filled shapes
+    for (let c = 0; c < this.chains.length; c++) {
+      this.chains[c].draw(ctx, this.getColor(), c === 0 ? 3 : 2);
+    }
+    // Body center
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species VII: Hydra (九头蛇) - Multiple independent heads
+// ============================================================
+class Hydra extends Creature {
+  setupCreature() {
+    this.complexityStage = this.complexityStage || 0;
+    this.props.rotation = 0;
+    this.props.coreSize = 25;
+    this.props.headTargets = [];
+    const heads = Math.min(this.complexityStage + 1, 5);
+    for (let i = 0; i < heads; i++) {
+      this.chains.push(new Chain(18, 8, 14, 4, 0.4));
+      this.props.headTargets.push({ x: 0, y: 0, phase: Math.random() * Math.PI * 2 });
+    }
+    if (this.complexityStage >= 2) {
+      const extra = Math.min((this.complexityStage - 1) * 2, 4);
+      for (let i = 0; i < extra; i++) {
+        this.chains.push(new Chain(8, 5, 6, 2, 0.6));
+      }
+    }
+  }
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+    this.chains = [];
+    this.props.headTargets = [];
+    this.setupCreature();
+  }
+  updateChains() {
+    this.props.rotation += 0.02 + this.attackPhase * 0.15;
+    this.centerCollision = { x: this.x, y: this.y, radius: this.props.coreSize + 15 };
+    const headCount = this.props.headTargets.length;
+    for (let i = 0; i < headCount; i++) {
+      const ht = this.props.headTargets[i];
+      ht.phase += 0.02;
+      const ang = this.props.rotation + (Math.PI * 2 / headCount) * i;
+      const reach = 80 + Math.sin(ht.phase) * 20 + this.attackPhase * 30;
+      const tx = this.x + Math.cos(ang) * reach;
+      const ty = this.y + Math.sin(ang) * reach;
+      ht.x += (tx - ht.x) * 0.1;
+      ht.y += (ty - ht.y) * 0.1;
+      this.chains[i].update(ht.x, ht.y);
+    }
+    // Extra tendrils
+    for (let i = headCount; i < this.chains.length; i++) {
+      const ang = this.props.rotation + (Math.PI * 2 / (this.chains.length - headCount)) * (i - headCount) + Math.PI;
+      const reach = 40 + Math.sin(this.timer * 0.05 + i) * 10;
+      this.chains[i].update(this.x + Math.cos(ang) * reach, this.y + Math.sin(ang) * reach);
+    }
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    // Core
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.props.coreSize, 0, Math.PI * 2);
+    ctx.fill();
+    // Heads
+    for (let i = 0; i < this.chains.length; i++) {
+      this.chains[i].draw(ctx, this.getColor(), i < this.props.headTargets.length ? 3 : 1.5);
+      // Head tip
+      if (i < this.props.headTargets.length) {
+        const tip = this.chains[i].segments[0];
+        ctx.fillStyle = this.getGlowColor();
+        ctx.beginPath();
+        ctx.arc(tip.x, tip.y, 6 + this.attackPhase * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species VIII: Leviathan (利维坦) - Ultimate, gravity field
+// ============================================================
+class Leviathan extends Creature {
+  setupCreature() {
+    this.complexityStage = this.complexityStage || 0;
+    const segs = 18 + this.complexityStage * 3;
+    const dist = 23;
+    const rStart = 28 + this.complexityStage * 2;
+    const rEnd = 6 + this.complexityStage;
+    this.chains.push(new Chain(segs, dist, rStart, rEnd, 0.28));
+  }
+  upgradeComplexity(stage) {
+    this.complexityStage = stage;
+    this.chains = [];
+    this.setupCreature();
+  }
+  updateChains() {
+    this.chains[0].update(this.x, this.y);
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    const chain = this.chains[0];
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    // Hunting gravity rings
+    if (this.isHunting) {
+      const head = chain.segments[0];
+      for (let i = 0; i < 3; i++) {
+        const p = ((this.huntTimer % 40) / 40 + i * 0.33) % 1;
+        const r = 40 + p * 80;
+        const a = (1 - p) * 0.4 * this.getStateAlpha();
+        ctx.strokeStyle = this.getGlowColor();
+        ctx.lineWidth = 4 - i;
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = this.getStateAlpha();
+    }
+    // Body
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
+    for (let i = 1; i < chain.segments.length; i++) {
+      ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
+    }
+    ctx.stroke();
+    // Segments
+    for (let i = 0; i < chain.segments.length; i++) {
+      const s = chain.segments[i];
+      if (i % 2 === 0 && s.radius > 0) {
+        ctx.fillStyle = this.getColor();
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Gravity field aura
+    const head = chain.segments[0];
+    for (let i = 0; i < 6; i++) {
+      const ang = i / 6 * Math.PI * 2 + this.timer * 0.1;
+      const dist = 20 + Math.sin(this.timer * 0.2 + i) * 10 + (this.scale || 1) * 10;
+      ctx.fillStyle = this.getColor();
+      ctx.beginPath();
+      ctx.arc(head.x + Math.cos(ang) * dist, head.y + Math.sin(ang) * dist, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+// ============================================================
+// Mustard Seed Enhanced - Game Configuration
+// ============================================================
+const CONFIG = {
+  PARTICLE_COUNT: 4000,
+  BASE_STAGE_ENERGY: 25,
+  WORLD_SIZE: 10000,
+  INITIAL_AI_COUNTS: { 0: 10, 1: 7, 2: 6, 3: 4, 4: 3, 5: 2, 6: 1, 7: 1 },
+  DASH_SPEED: 15,
+  DASH_DURATION: 12,
+  DASH_COOLDOWN: 180,      // 3 sec at 60fps
+  PARTICLE_CLUSTER_COUNT: 25,
+  PARTICLE_CLUSTER_SIZE: 40,
+  DANGER_RANGE: 500,
+  FLEE_SPEED_MULT: 1.4,
+  SAME_LEVEL_BOUNCE: 80,
+  SAME_LEVEL_ENERGY_STEAL: 0.05,
+};
+
+// Light-theme color palette: saturated, high contrast on light background
+const SPECIES = [
+  { name: 'I. Photon (光子)', desc: '微尘级 - 神经质的高频移动', color: '#6a6a6a', glow: '#888',
+    speed: 0.05, huntSpeed: 0.055, huntDuration: 120, huntCooldown: 600,
+    skillName: '闪现', skillIcon: '⚡', skillCd: 180, cls: 'Photon' },
+  { name: 'II. Dart (飞梭)', desc: '幼体级 - 僵硬的冲刺与滑行', color: '#0099aa', glow: '#00bbd4',
+    speed: 0.04, huntSpeed: 0.055, huntDuration: 120, huntCooldown: 600,
+    skillName: '穿刺', skillIcon: '🗡️', skillCd: 240, cls: 'Dart' },
+  { name: 'III. Pulse (水母)', desc: '腔肠级 - 径向收缩与喷射', color: '#d44060', glow: '#e8507a',
+    speed: 0.035, huntSpeed: 0.045, huntDuration: 120, huntCooldown: 600,
+    skillName: '电击', skillIcon: '⚡', skillCd: 300, cls: 'Pulse' },
+  { name: 'IV. Serpent (蛇刺)', desc: '环节级 - 正弦波游动与倒刺', color: '#1a9a50', glow: '#22b860',
+    speed: 0.03, huntSpeed: 0.045, huntDuration: 150, huntCooldown: 720,
+    skillName: '疾冲', skillIcon: '💨', skillCd: 300, cls: 'Serpent' },
+  { name: 'V. Pincer (双螯)', desc: '甲壳级 - 重装甲与机械剪切', color: '#d08020', glow: '#e8a020',
+    speed: 0.02, huntSpeed: 0.045, huntDuration: 150, huntCooldown: 840,
+    skillName: '护甲', skillIcon: '🛡️', skillCd: 360, cls: 'Pincer' },
+  { name: 'VI. Glider (滑翔者)', desc: '蝠鲼级 - 优雅的波浪飞行', color: '#5566aa', glow: '#7788cc',
+    speed: 0.018, huntSpeed: 0.05, huntDuration: 180, huntCooldown: 960,
+    skillName: '声波', skillIcon: '🔊', skillCd: 420, cls: 'Glider' },
+  { name: 'VII. Hydra (九头蛇)', desc: '聚合级 - 多核心独立索敌', color: '#9a30c0', glow: '#b840e0',
+    speed: 0.015, huntSpeed: 0.05, huntDuration: 180, huntCooldown: 1080,
+    skillName: '分裂', skillIcon: '🧬', skillCd: 480, cls: 'Hydra' },
+  { name: 'VIII. Leviathan (利维坦)', desc: '巨兽级 - 吞噬一切的引力场', color: '#c03030', glow: '#e04040',
+    speed: 0.015, huntSpeed: 0.045, huntDuration: 210, huntCooldown: 1200,
+    skillName: '引力场', skillIcon: '🌀', skillCd: 540, cls: 'Leviathan' },
+];
+
+function stageMaxEnergy(level) {
+  // Smoother curve: 25 * 1.5^level instead of 25 * 2^level
+  return Math.floor(CONFIG.BASE_STAGE_ENERGY * Math.pow(1.5, level));
+}
+
+const CLASS_MAP = {
+  Photon, Dart, Pulse, Serpent, Pincer, Glider, Hydra, Leviathan
+};
+// ============================================================
+// Mustard Seed Enhanced - Main Game Engine
+// ============================================================
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.mmCanvas = document.getElementById('minimap');
+    this.mmCtx = this.mmCanvas.getContext('2d');
+    this.width = 0;
+    this.height = 0;
+
+    // Camera
+    this.camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 };
+    this.mouseScreen = { x: 0, y: 0 };
+
+    // Entities
+    this.creatures = [];       // player creatures
+    this.aiCreatures = [];     // AI creatures
+    this.aiGroups = new Map();
+    this.particles = [];
+    this.birthAnimations = [];
+
+    // State
+    this.playerLevel = 0;
+    this.evolutionStage = 0;
+    this.stageEnergy = 0;
+    this.stageMaxEnergy = stageMaxEnergy(0);
+    this.worldSize = CONFIG.WORLD_SIZE;
+    this.frameCount = 0;
+    this.gameStarted = false;
+    this.respawnTimers = new Map();
+    this.particleTargets = new Map();
+
+    // Spatial hashing
+    this.particleHash = new SpatialHash(200);
+    this.creatureHash = new SpatialHash(500);
+
+    // Score
+    this.score = { startTime: 0, survivalTime: 0, maxLevel: 0, kills: 0 };
+
+    // Danger warning
+    this.dangerTimer = 0;
+
+    // Player skill/dash cooldown tracking for UI
+    this.playerDashCd = 0;
+    this.playerSkillCd = 0;
+
+    // One extra life
+    this.hasExtraLife = true;
+
+    // Environment zones
+    this.zones = this._generateZones();
+
+    // Shrinking circle (battle royale)
+    this.circle = {
+      phases: [
+        { startFrame: 3600, duration: 1800, fromRadius: 5000, toRadius: 3000 },  // 60s: shrink over 30s
+        { startFrame: 9000, duration: 1800, fromRadius: 3000, toRadius: 1750 },  // 150s: shrink over 30s
+      ],
+      currentPhase: 0,
+      radius: 5000,        // current safe radius (half of worldSize)
+      targetRadius: 5000,
+      active: false,
+      finished: false,
+      damageTimer: 0,
+      warningShown: [false, false],
+    };
+
+    // Showcase creature for title screen
+    this.showcaseCreatures = [];
+    this.previewMode = true;
+
+    this.resize();
+    this.preInit();          // create world before start
+    this.setupStartScreen();
+    this.setupEvents();
+    this.animate();          // start rendering immediately (preview mode)
+  }
+
+  // --- Environment Zones ---
+  _generateZones() {
+    const zones = [];
+    // Thermal vents - produce particles
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + Math.random() * 0.5;
+      const dist = 1500 + Math.random() * 3000;
+      zones.push({
+        type: 'vent',
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        radius: 200 + Math.random() * 100,
+        color: 'rgba(220,80,40,0.06)',
+        spawnTimer: 0,
+        spawnRate: 120 // frames between spawns
+      });
+    }
+    // Current streams - speed boost areas
+    for (let i = 0; i < 5; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 2000 + Math.random() * 2500;
+      zones.push({
+        type: 'current',
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        radius: 300 + Math.random() * 200,
+        angle: Math.random() * Math.PI * 2,
+        strength: 1.5,
+        color: 'rgba(30,120,220,0.05)'
+      });
+    }
+    // Safe havens
+    for (let i = 0; i < 3; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 1000 + Math.random() * 2000;
+      zones.push({
+        type: 'safe',
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        radius: 250,
+        color: 'rgba(20,160,80,0.04)'
+      });
+    }
+    return zones;
+  }
+
+  // --- Init ---
+  preInit() {
+    // Create world entities for live background preview
+    this.createAllAICreatures();
+    this.generateParticles(CONFIG.PARTICLE_COUNT);
+    this._spawnShowcaseCreature();
+  }
+
+  _spawnShowcaseCreature() {
+    // Spawn a magenta Glider (manta ray shape) for the title screen
+    const level = 5; // Glider - elegant manta ray with wingspan
+    const spec = {
+      ...SPECIES[level],
+      color: '#d4207a',   // vibrant magenta
+      glow: '#f040a0',    // bright magenta glow
+    };
+    const cls = CLASS_MAP[spec.cls];
+    // Start near center so it's immediately visible
+    const startX = this.camera ? this.camera.x : 0;
+    const startY = this.camera ? this.camera.y + 80 : 80;
+    const c = new cls(startX, startY, level, spec, true);
+    c.velocity = { x: 0, y: 0 };
+    c.flockId = 0;
+    // Use natural scale for level 5 — no artificial enlargement
+    c.scale = Math.pow(3, level / 7); // ≈ 2.19, same as in-game creatures
+    c.groupId = 'showcase';
+    c.complexityStage = 2; // full wing detail
+    c.upgradeComplexity(2);
+    c.wanderAngle = 0;
+    c.wanderTimer = 0;
+    c.isFrozen = false;
+    c.frozenTimer = 0;
+    c._showcaseAngle = -Math.PI / 2; // start from left side
+
+    // Pre-run physics for 60 frames so chains are settled
+    for (let i = 0; i < 60; i++) {
+      c.update(startX + i * 2, startY, false, this.worldSize, []);
+    }
+
+    this.showcaseCreatures.push(c);
+  }
+
+  _updateShowcase() {
+    // Move showcase creature in a gentle figure-8, kept within screen center area
+    this.showcaseCreatures.forEach(c => {
+      c._showcaseAngle += 0.004;
+      const a = c._showcaseAngle;
+      // Compact orbit — stays well within visible area
+      const rx = this.width * 0.18 / this.camera.zoom;
+      const ry = this.height * 0.10 / this.camera.zoom;
+      const tx = this.camera.x + Math.sin(a) * rx;
+      const ty = this.camera.y + 60 / this.camera.zoom + Math.sin(a * 2) * ry;
+      c.update(tx, ty, false, this.worldSize, []);
+    });
+  }
+
+  _drawShowcase(bounds) {
+    this.showcaseCreatures.forEach(c => {
+      if (!this.isInScreen(c, bounds)) return;
+      c.draw(this.ctx);
+    });
+  }
+
+  setupStartScreen() {
+    const btn = document.getElementById('startButton');
+    const overlay = document.getElementById('startOverlay');
+    btn.addEventListener('click', () => {
+      window.AudioMgr.init();
+      // Fade out the overlay
+      overlay.classList.add('hidden');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        // Remove showcase creature from world
+        this.showcaseCreatures = [];
+        // Now start the actual game
+        this.previewMode = false;
+        this.gameStarted = true;
+        this.init();
+        // Show HUD elements
+        document.getElementById('ui').classList.add('visible');
+        document.getElementById('skillBar').classList.add('visible');
+        document.getElementById('minimap').classList.add('visible');
+        document.getElementById('info').classList.add('visible');
+      }, 800);
+    });
+  }
+
+  resize() {
+    this.width = this.canvas.width = window.innerWidth;
+    this.height = this.canvas.height = window.innerHeight;
+    this.mouseScreen.x = this.width / 2;
+    this.mouseScreen.y = this.height / 2;
+  }
+
+  init() {
+    // Clear preview remnants and create fresh world
+    this.aiCreatures = [];
+    this.aiGroups.clear();
+    this.particles = [];
+    this.birthAnimations = [];
+    this.respawnTimers.clear();
+    this.particleTargets.clear();
+
+    // Reset frame counter (preview may have accumulated frames)
+    this.frameCount = 0;
+
+    // Reset camera
+    this.camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 };
+
+    // Reset shrinking circle
+    this.circle.currentPhase = 0;
+    this.circle.radius = 5000;
+    this.circle.targetRadius = 5000;
+    this.circle.active = false;
+    this.circle.finished = false;
+    this.circle.damageTimer = 0;
+    this.circle.warningShown = [false, false];
+
+    // Reset game state
+    this.playerLevel = 0;
+    this.evolutionStage = 0;
+    this.stageEnergy = 0;
+    this.stageMaxEnergy = stageMaxEnergy(0);
+    this.hasExtraLife = true;
+    this.dangerTimer = 0;
+    this.playerDashCd = 0;
+    this.playerSkillCd = 0;
+
+    // Create fresh world
+    this.createAllAICreatures();
+    this.generateParticles(CONFIG.PARTICLE_COUNT);
+    this.createPlayer(0, 0, true);
+    this.score.startTime = Date.now();
+    this.score.maxLevel = 0;
+  }
+
+  resetGame() {
+    this.creatures = [];
+    this.aiCreatures = [];
+    this.aiGroups.clear();
+    this.particles = [];
+    this.particleTargets.clear();
+    this.birthAnimations = [];
+    this.respawnTimers.clear();
+    this.playerLevel = 0;
+    this.evolutionStage = 0;
+    this.stageEnergy = 0;
+    this.stageMaxEnergy = stageMaxEnergy(0);
+    this.camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 };
+    this.frameCount = 0;
+    this.hasExtraLife = true;
+    this.score = { startTime: Date.now(), survivalTime: 0, maxLevel: 0, kills: 0 };
+
+    // Reset shrinking circle
+    this.circle.currentPhase = 0;
+    this.circle.radius = 5000;
+    this.circle.targetRadius = 5000;
+    this.circle.active = false;
+    this.circle.finished = false;
+    this.circle.damageTimer = 0;
+    this.circle.warningShown = [false, false];
+    this.zones = this._generateZones();
+    const go = document.getElementById('gameOverScreen');
+    const gw = document.getElementById('gameWinScreen');
+    if (go) go.remove();
+    if (gw) gw.remove();
+    this.init();
+    this.updateUI();
+  }
+
+  // --- Events ---
+  setupEvents() {
+    window.addEventListener('resize', () => this.resize());
+
+    this.canvas.addEventListener('mousemove', e => {
+      this.mouseScreen.x = e.clientX;
+      this.mouseScreen.y = e.clientY;
+    });
+
+    window.addEventListener('keydown', e => {
+      if (!this.gameStarted) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        this.playerDash();
+      }
+      if (e.code === 'KeyQ') {
+        this.playerSkill();
+      }
+    });
+  }
+
+  // --- Player Dash ---
+  playerDash() {
+    if (this.creatures.length === 0) return;
+    const leader = this.creatures[0];
+    if (leader.dashCooldown > 0 || leader.isDashing) return;
+
+    window.AudioMgr.dash();
+    const dx = this.mouseScreen.x - this.width / 2;
+    const dy = this.mouseScreen.y - this.height / 2;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
+
+    this.creatures.forEach(c => {
+      c.isDashing = true;
+      c.dashTimer = CONFIG.DASH_DURATION;
+      c.dashCooldown = CONFIG.DASH_COOLDOWN;
+      c.dashDirX = dx / dist;
+      c.dashDirY = dy / dist;
+      c.invulnTimer = CONFIG.DASH_DURATION / 60;
+    });
+  }
+
+  // --- Player Skill ---
+  playerSkill() {
+    if (this.creatures.length === 0) return;
+    const leader = this.creatures[0];
+    if (leader.skillCooldown > 0) return;
+
+    const spec = SPECIES[this.playerLevel];
+    leader.skillCooldown = spec.skillCd;
+    window.AudioMgr.useSkill();
+
+    switch (this.playerLevel) {
+      case 0: // Photon - Blink forward
+        this._skillBlink();
+        break;
+      case 1: // Dart - Pierce (speed burst + damage aura)
+        this._skillPierce();
+        break;
+      case 2: // Pulse - Electric shock AOE
+        this._skillShock();
+        break;
+      case 3: // Serpent - Speed rush
+        this._skillRush();
+        break;
+      case 4: // Pincer - Armor (invuln)
+        this._skillArmor();
+        break;
+      case 5: // Glider - Sonic wave (push enemies)
+        this._skillSonicWave();
+        break;
+      case 6: // Hydra - Temporary split (extra heads)
+        this._skillSplit();
+        break;
+      case 7: // Leviathan - Gravity pull
+        this._skillGravity();
+        break;
+    }
+  }
+
+  _skillBlink() {
+    const dist = 200 * (this.creatures[0].scale || 1);
+    const ang = this.creatures[0].angle;
+    this.creatures.forEach(c => {
+      c.x += Math.cos(ang) * dist;
+      c.y += Math.sin(ang) * dist;
+      c.invulnTimer = 0.5;
+    });
+  }
+
+  _skillPierce() {
+    this.creatures.forEach(c => {
+      c.isDashing = true;
+      c.dashTimer = 20;
+      c.dashDirX = Math.cos(c.angle);
+      c.dashDirY = Math.sin(c.angle);
+      c.invulnTimer = 0.5;
+    });
+  }
+
+  _skillShock() {
+    // Stun nearby AI
+    const range = 300 * (this.creatures[0].scale || 1);
+    const cx = this.creatures[0].x;
+    const cy = this.creatures[0].y;
+    this.aiCreatures.forEach(ai => {
+      const dx = ai.x - cx;
+      const dy = ai.y - cy;
+      if (dx * dx + dy * dy < range * range) {
+        ai.isFrozen = true;
+        ai.frozenTimer = 90; // 1.5 sec stun
+      }
+    });
+    // Visual flash
+    this._evoFlash('rgba(200,60,60,0.15)');
+  }
+
+  _skillRush() {
+    this.creatures.forEach(c => {
+      c.isDashing = true;
+      c.dashTimer = 30;
+      c.dashDirX = Math.cos(c.angle);
+      c.dashDirY = Math.sin(c.angle);
+      c.invulnTimer = 0.5;
+    });
+  }
+
+  _skillArmor() {
+    this.creatures.forEach(c => {
+      c.invulnTimer = 3; // 3 seconds invuln
+    });
+    this._evoFlash('rgba(200,140,20,0.15)');
+  }
+
+  _skillSonicWave() {
+    const range = 500 * (this.creatures[0].scale || 1);
+    const cx = this.creatures[0].x;
+    const cy = this.creatures[0].y;
+    this.aiCreatures.forEach(ai => {
+      const dx = ai.x - cx;
+      const dy = ai.y - cy;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < range && d > 0) {
+        const push = 200 * (1 - d / range);
+        ai.x += (dx / d) * push;
+        ai.y += (dy / d) * push;
+      }
+    });
+  }
+
+  _skillSplit() {
+    // Temporarily double creature count for 5 seconds
+    const copies = [];
+    this.creatures.forEach(c => {
+      const spec = SPECIES[this.playerLevel];
+      const cls = CLASS_MAP[spec.cls];
+      const nc = new cls(c.x + (Math.random() - 0.5) * 50, c.y + (Math.random() - 0.5) * 50,
+        this.playerLevel, spec, false);
+      nc.velocity = { x: 0, y: 0 };
+      nc.scale = c.scale;
+      nc.groupId = 'player';
+      nc.isFrozen = false;
+      nc.frozenTimer = 0;
+      nc._tempClone = true;
+      nc._cloneLife = 300; // 5 seconds
+      copies.push(nc);
+    });
+    this.creatures.push(...copies);
+  }
+
+  _skillGravity() {
+    // Pull all nearby particles and creatures toward player
+    const range = 800 * (this.creatures[0].scale || 1);
+    const cx = this.creatures[0].x;
+    const cy = this.creatures[0].y;
+    // Pull particles
+    this.particles.forEach(p => {
+      const dx = cx - p.x;
+      const dy = cy - p.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < range && d > 0) {
+        const pull = 5 * (1 - d / range);
+        p.vx += (dx / d) * pull;
+        p.vy += (dy / d) * pull;
+      }
+    });
+    // Pull lower-level AI
+    this.aiCreatures.forEach(ai => {
+      if (ai.type >= this.playerLevel) return;
+      const dx = cx - ai.x;
+      const dy = cy - ai.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < range && d > 0) {
+        const pull = 3 * (1 - d / range);
+        ai.x += (dx / d) * pull;
+        ai.y += (dy / d) * pull;
+      }
+    });
+    this._evoFlash('rgba(200,50,50,0.12)');
+  }
+
+  _evoFlash(color) {
+    const div = document.createElement('div');
+    div.className = 'evo-flash';
+    if (color) div.style.background = `radial-gradient(ellipse at center, ${color}, transparent)`;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 800);
+  }
+
+  // --- Particle Generation (Clustered) ---
+  generateParticles(count) {
+    const clusterCount = CONFIG.PARTICLE_CLUSTER_COUNT;
+    const clusterSize = CONFIG.PARTICLE_CLUSTER_SIZE;
+    const perCluster = Math.floor(count * 0.5 / clusterCount);
+    const scattered = count - perCluster * clusterCount;
+
+    // Clustered particles (50% near vents and random clusters)
+    for (let c = 0; c < clusterCount; c++) {
+      let cx, cy;
+      if (c < this.zones.length && this.zones[c].type === 'vent') {
+        cx = this.zones[c].x;
+        cy = this.zones[c].y;
+      } else {
+        cx = (Math.random() - 0.5) * this.worldSize * 0.8;
+        cy = (Math.random() - 0.5) * this.worldSize * 0.8;
+      }
+      for (let i = 0; i < perCluster; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = Math.random() * clusterSize * (this.zones[c] ? this.zones[c].radius / 200 : 1) * 3;
+        this.particles.push({
+          x: cx + Math.cos(ang) * dist,
+          y: cy + Math.sin(ang) * dist,
+          size: Math.random() * 3 + 1.5,
+          energy: 1,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5
+        });
+      }
+    }
+
+    // Scattered particles (50%)
+    for (let i = 0; i < scattered; i++) {
+      this.particles.push({
+        x: (Math.random() - 0.5) * this.worldSize,
+        y: (Math.random() - 0.5) * this.worldSize,
+        size: Math.random() * 3 + 1.5,
+        energy: 1,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5
+      });
+    }
+
+    // Guarantee particles near spawn
+    for (let i = 0; i < 30; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 50 + Math.random() * 250;
+      this.particles.push({
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        size: Math.random() * 3 + 1.5,
+        energy: 1,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3
+      });
+    }
+  }
+
+  // --- Creature Creation ---
+  createPlayer(x = 0, y = 0, initial = false) {
+    const spec = SPECIES[this.playerLevel];
+    const scale = Math.pow(3, this.playerLevel / 7);
+    this.camera.targetZoom = 1 / Math.pow(1.2, this.playerLevel);
+    this.creatures = [];
+
+    let count;
+    if (this.playerLevel >= 3) count = 1;
+    else count = this.evolutionStage + 1;
+
+    const cls = CLASS_MAP[spec.cls];
+    for (let i = 0; i < count; i++) {
+      const ang = (i / count) * Math.PI * 2;
+      const offset = 50 * scale;
+      const c = new cls(x + Math.cos(ang) * offset, y + Math.sin(ang) * offset, this.playerLevel, spec, false);
+      c.velocity = { x: 0, y: 0 };
+      c.flockId = i;
+      c.scale = scale;
+      c.complexityStage = 0;
+      c.groupId = 'player';
+      c.wanderAngle = Math.random() * Math.PI * 2;
+      c.wanderTimer = 0;
+      if (initial) { c.isFrozen = false; c.frozenTimer = 0; c.invulnTimer = 5; }
+      this.creatures.push(c);
+    }
+    this.stageEnergy = 0;
+    this.stageMaxEnergy = stageMaxEnergy(this.playerLevel);
+    this.updateUI();
+  }
+
+  createAllAICreatures() {
+    const half = this.worldSize / 2;
+    const minDist = 1500;
+    const placed = [];
+    for (let lvl = 0; lvl < SPECIES.length; lvl++) {
+      const count = CONFIG.INITIAL_AI_COUNTS[lvl] || 0;
+      const sep = 800 * Math.pow(3, lvl / 7);
+      for (let i = 0; i < count; i++) {
+        let cx, cy, ok = false, attempts = 0;
+        while (!ok && attempts < 50) {
+          const ang = Math.random() * Math.PI * 2;
+          const dist = minDist + Math.random() * (half - minDist);
+          cx = Math.cos(ang) * dist;
+          cy = Math.sin(ang) * dist;
+          ok = true;
+          for (const p of placed) {
+            const dx = cx - p.x, dy = cy - p.y;
+            if (Math.sqrt(dx * dx + dy * dy) < sep + p.sep) { ok = false; break; }
+          }
+          attempts++;
+        }
+        if (!ok) {
+          const ang = Math.random() * Math.PI * 2;
+          const dist = minDist + Math.random() * (half - minDist);
+          cx = Math.cos(ang) * dist;
+          cy = Math.sin(ang) * dist;
+        }
+        this.createAIGroup(lvl, cx, cy, 1, true);
+        placed.push({ x: cx, y: cy, sep });
+      }
+    }
+  }
+
+  createAIGroup(level, x, y, count, initial = false) {
+    const spec = SPECIES[level];
+    const gid = Math.random();
+    const scale = Math.pow(3, level / 7);
+    this.aiGroups.set(gid, { level, evolutionStage: 0, energy: 0 });
+    const cls = CLASS_MAP[spec.cls];
+    for (let i = 0; i < count; i++) {
+      const ang = (i / count) * Math.PI * 2;
+      const offset = 50 * scale;
+      const c = new cls(x + Math.cos(ang) * offset, y + Math.sin(ang) * offset, level, spec, true);
+      c.velocity = { x: 0, y: 0 };
+      c.flockId = i;
+      c.scale = scale;
+      c.groupId = gid;
+      c.complexityStage = 0;
+      c.wanderAngle = Math.random() * Math.PI * 2;
+      c.wanderTimer = 0;
+      if (initial) { c.isFrozen = false; c.frozenTimer = 0; }
+      this.aiCreatures.push(c);
+    }
+  }
+
+  // --- Respawn ---
+  checkAndRespawnCreatures() {
+    if (this.frameCount % 60 !== 0) return;
+
+    // Count alive AI by level
+    const counts = {};
+    this.aiCreatures.forEach(c => {
+      if (!c.isDying) counts[c.type] = (counts[c.type] || 0) + 1;
+    });
+
+    // Target counts depend on circle state
+    // During/after shrinking: maintain a minimum population inside the safe zone
+    const safeRadius = this.circle.finished ? this.circle.radius : 
+                       (this.circle.active ? this.circle.radius : this.worldSize / 2);
+
+    // Scale targets based on safe area ratio
+    const areaRatio = (safeRadius * safeRadius) / (5000 * 5000);
+    
+    // Respawn levels 0-3 (small to mid creatures) to keep the world alive
+    for (let lvl = 0; lvl <= 3; lvl++) {
+      const baseTarget = CONFIG.INITIAL_AI_COUNTS[lvl] || 0;
+      // Keep at least 40% of initial count, scaled by area
+      const minTarget = Math.max(2, Math.floor(baseTarget * Math.max(0.4, areaRatio)));
+      const current = counts[lvl] || 0;
+
+      if (current < minTarget && !this.respawnTimers.has(lvl)) {
+        // Shorter delay for low-level creatures, longer for higher
+        const delay = (150 + lvl * 120) + Math.floor(Math.random() * 200);
+        this.respawnTimers.set(lvl, delay);
+      }
+
+      if (this.respawnTimers.has(lvl)) {
+        const t = this.respawnTimers.get(lvl) - 60;
+        if (t <= 0) {
+          this._spawnInSafeZone(lvl, safeRadius);
+          this.respawnTimers.delete(lvl);
+        } else {
+          this.respawnTimers.set(lvl, t);
+        }
+      }
+    }
+
+    // Occasionally spawn mid-level creatures (4-5) if population is very low
+    if (this.frameCount % 300 === 0) {
+      for (let lvl = 4; lvl <= 5; lvl++) {
+        const current = counts[lvl] || 0;
+        const minTarget = Math.max(1, Math.floor((CONFIG.INITIAL_AI_COUNTS[lvl] || 0) * 0.3));
+        if (current < minTarget) {
+          this._spawnInSafeZone(lvl, safeRadius);
+        }
+      }
+    }
+  }
+
+  _spawnAtEdge(level) {
+    this._spawnInSafeZone(level, this.worldSize / 2);
+  }
+
+  _spawnInSafeZone(level, safeRadius) {
+    const scale = Math.pow(3, level / 7);
+    const minDistFromPlayer = 800 * scale;
+    const playerX = this.creatures.length > 0 ? this.creatures[0].x : this.camera.x;
+    const playerY = this.creatures.length > 0 ? this.creatures[0].y : this.camera.y;
+
+    for (let i = 0; i < 50; i++) {
+      // Random position inside safe zone
+      const ang = Math.random() * Math.PI * 2;
+      const dist = Math.random() * safeRadius * 0.85; // stay well inside
+      const cx = Math.cos(ang) * dist;
+      const cy = Math.sin(ang) * dist;
+
+      // Must be far enough from player
+      const dx = cx - playerX, dy = cy - playerY;
+      if (dx * dx + dy * dy < minDistFromPlayer * minDistFromPlayer) continue;
+
+      // Also avoid spawning on screen
+      const screenDx = cx - this.camera.x, screenDy = cy - this.camera.y;
+      const vw = this.width / this.camera.zoom / 2 + 200;
+      const vh = this.height / this.camera.zoom / 2 + 200;
+      if (Math.abs(screenDx) < vw && Math.abs(screenDy) < vh) continue;
+
+      this.createAIGroup(level, cx, cy, 1, false);
+      return;
+    }
+
+    // Fallback: spawn at random position inside safe zone
+    const ang = Math.random() * Math.PI * 2;
+    const dist = safeRadius * (0.3 + Math.random() * 0.5);
+    this.createAIGroup(level, Math.cos(ang) * dist, Math.sin(ang) * dist, 1, false);
+  }
+
+  // --- Update UI ---
+  updateUI() {
+    const spec = SPECIES[this.playerLevel];
+    document.getElementById('speciesName').textContent = spec.name;
+    document.getElementById('speciesDesc').textContent = spec.desc;
+    const pct = (this.stageEnergy / this.stageMaxEnergy * 100);
+    document.getElementById('energyBar').style.width = pct + '%';
+    document.getElementById('energyText').textContent =
+      `阶段 ${this.evolutionStage + 1}/5 - ${Math.floor(this.stageEnergy)} / ${this.stageMaxEnergy}`;
+    document.getElementById('creatureCount').textContent = this.creatures.length;
+    document.getElementById('aiCount').textContent = this.aiCreatures.length;
+    document.getElementById('killCount').textContent = this.score.kills;
+
+    // Survival time
+    if (this.score.startTime) {
+      const sec = Math.floor((Date.now() - this.score.startTime) / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      document.getElementById('survivalTime').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Skill icons
+    document.getElementById('skillIcon').textContent = spec.skillIcon;
+
+    // Cooldowns
+    this._updateCooldownUI();
+  }
+
+  _updateCooldownUI() {
+    const leader = this.creatures[0];
+    if (!leader) return;
+
+    const skillSlot = document.getElementById('skill-q');
+    const skillCdEl = document.getElementById('skillCd');
+    if (leader.skillCooldown > 0) {
+      skillSlot.classList.add('on-cd');
+      skillCdEl.textContent = Math.ceil(leader.skillCooldown / 60) + 's';
+    } else {
+      skillSlot.classList.remove('on-cd');
+    }
+
+    const dashSlot = document.getElementById('skill-space');
+    const dashCdEl = document.getElementById('dashCd');
+    if (leader.dashCooldown > 0) {
+      dashSlot.classList.add('on-cd');
+      dashCdEl.textContent = Math.ceil(leader.dashCooldown / 60) + 's';
+    } else {
+      dashSlot.classList.remove('on-cd');
+    }
+  }
+
+  // --- Camera ---
+  updateCamera() {
+    if (!this.creatures || this.creatures.length === 0) return;
+    let tx = 0, ty = 0, cnt = 0;
+    this.creatures.forEach(c => {
+      if (c && typeof c.x === 'number') { tx += c.x; ty += c.y; cnt++; }
+    });
+    if (cnt === 0) return;
+    tx /= cnt;
+    ty /= cnt;
+    this.camera.x += (tx - this.camera.x) * 0.08;
+    this.camera.y += (ty - this.camera.y) * 0.08;
+    this.camera.zoom += (this.camera.targetZoom - this.camera.zoom) * 0.05;
+  }
+
+  getScreenBounds(margin = 1) {
+    const vw = (this.width / this.camera.zoom) * margin;
+    const vh = (this.height / this.camera.zoom) * margin;
+    return {
+      minX: this.camera.x - vw / 2,
+      maxX: this.camera.x + vw / 2,
+      minY: this.camera.y - vh / 2,
+      maxY: this.camera.y + vh / 2
+    };
+  }
+
+  isInScreen(obj, bounds) {
+    return obj.x > bounds.minX && obj.x < bounds.maxX && obj.y > bounds.minY && obj.y < bounds.maxY;
+  }
+
+  screenToWorld(sx, sy) {
+    return {
+      x: (sx - this.width / 2) / this.camera.zoom + this.camera.x,
+      y: (sy - this.height / 2) / this.camera.zoom + this.camera.y
+    };
+  }
+
+  // --- Flocking ---
+  updateFlocking(creature, target, isAI = false) {
+    const sc = creature.scale || 1;
+    let steerX = 0, steerY = 0;
+    let hasTarget = false;
+    let targetX = 0, targetY = 0;
+
+    if (isAI) {
+      const t = this.findAITarget(creature);
+      if (t) { targetX = t.x; targetY = t.y; hasTarget = true; }
+    } else {
+      targetX = target.x;
+      targetY = target.y;
+      hasTarget = true;
+
+      // Player: also steer toward nearby lower-level AI (hunting assist)
+      const huntRange = 500 * sc;
+      let closest = null, closestDist = huntRange;
+      this.aiCreatures.forEach(ai => {
+        if (ai.type >= creature.type) return;
+        const dx = ai.x - creature.x, dy = ai.y - creature.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < closestDist) { closestDist = d; closest = ai; }
+      });
+      if (closest) {
+        const dx = closest.x - creature.x, dy = closest.y - creature.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 0) {
+          const w = 0.4 * (1 - closestDist / huntRange);
+          targetX += (dx / d) * w * 200;
+          targetY += (dy / d) * w * 200;
+        }
+      }
+    }
+
+    // Seek target
+    if (hasTarget) {
+      const dx = targetX - creature.x, dy = targetY - creature.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 0) { steerX += (dx / d); steerY += (dy / d); }
+    }
+
+    // Flee from higher-level creatures
+    const fleeRange = 400 * sc;
+    const fleeRangeSq = fleeRange * fleeRange;
+    const allCreatures = isAI
+      ? [...this.creatures, ...this.aiCreatures.filter(a => a !== creature)]
+      : [...this.creatures.filter(c => c !== creature), ...this.aiCreatures];
+
+    allCreatures.forEach(other => {
+      if (other.type <= creature.type) return;
+      const dx = creature.x - other.x, dy = creature.y - other.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < fleeRangeSq && dSq > 0) {
+        const d = Math.sqrt(dSq);
+        const w = 0.5 * (1 - d / fleeRange);
+        steerX += (dx / d) * w;
+        steerY += (dy / d) * w;
+      }
+    });
+
+    // AI: also flee from same-level player if near
+    if (isAI && creature.type <= this.playerLevel) {
+      this.creatures.forEach(pc => {
+        const dx = creature.x - pc.x, dy = creature.y - pc.y;
+        const dSq = dx * dx + dy * dy;
+        const range = 300 * sc;
+        if (dSq < range * range && dSq > 0) {
+          const d = Math.sqrt(dSq);
+          steerX += (dx / d) * CONFIG.FLEE_SPEED_MULT * 0.3;
+          steerY += (dy / d) * CONFIG.FLEE_SPEED_MULT * 0.3;
+        }
+      });
+    }
+
+    // Separation from same-group
+    const mates = isAI
+      ? this.aiCreatures.filter(a => a !== creature && a.groupId === creature.groupId)
+      : this.creatures.filter(c => c !== creature);
+    if (mates.length > 0) {
+      const sepRange = 150 * sc;
+      const sepSq = sepRange * sepRange;
+      mates.forEach(m => {
+        const dx = creature.x - m.x, dy = creature.y - m.y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < sepSq && dSq > 0) {
+          const d = Math.sqrt(dSq);
+          steerX += (dx / d) * 0.5 * (1 - d / sepRange);
+          steerY += (dy / d) * 0.5 * (1 - d / sepRange);
+        }
+      });
+
+      // Cohesion
+      const cohRange = 300 * sc;
+      const avgX = mates.reduce((s, m) => s + m.x, 0) / mates.length;
+      const avgY = mates.reduce((s, m) => s + m.y, 0) / mates.length;
+      const cdx = avgX - creature.x, cdy = avgY - creature.y;
+      const cd = cdx * cdx + cdy * cdy;
+      if (cd > cohRange * cohRange) {
+        const d = Math.sqrt(cd);
+        steerX += (cdx / d) * 0.2;
+        steerY += (cdy / d) * 0.2;
+      }
+    }
+
+    // World boundary
+    const half = this.worldSize / 2;
+    const margin = 200 * sc;
+    const distFromCenter = Math.sqrt(creature.x * creature.x + creature.y * creature.y);
+    if (distFromCenter > half - margin) {
+      const d = distFromCenter;
+      if (d > 0) {
+        const w = (distFromCenter - (half - margin)) / margin;
+        steerX -= (creature.x / d) * w * 2;
+        steerY -= (creature.y / d) * w * 2;
+      }
+    }
+
+    // Apply steering to get target position
+    const speed = (creature.isHunting && creature.config.huntSpeed || creature.config.speed) * 100;
+    return {
+      x: creature.x + steerX * speed,
+      y: creature.y + steerY * speed
+    };
+  }
+
+  findAITarget(creature) {
+    // Wander + occasional particle seeking
+    creature.wanderTimer++;
+    if (creature.wanderTimer > 120) {
+      creature.wanderAngle += (Math.random() - 0.5) * 1.0;
+      creature.wanderTimer = 0;
+    }
+    const sc = creature.scale || 1;
+    const wanderDist = 200 * sc;
+    let tx = creature.x + Math.cos(creature.wanderAngle) * wanderDist;
+    let ty = creature.y + Math.sin(creature.wanderAngle) * wanderDist;
+
+    // Look for nearby lower-level prey
+    const huntRange = CONFIG.AI_HUNT_RANGE * sc;
+    let prey = null, preyDist = huntRange;
+    const targets = creature.type > 0 ? [...this.creatures, ...this.aiCreatures] : this.aiCreatures;
+    targets.forEach(t => {
+      if (t === creature || t.groupId === creature.groupId) return;
+      if (t.type >= creature.type) return;
+      const dx = t.x - creature.x, dy = t.y - creature.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < preyDist) { preyDist = d; prey = t; }
+    });
+
+    // Grace period: AI won't hunt targets near spawn in first 30 seconds
+    if (prey && this.frameCount < CONFIG.AI_GRACE_PERIOD) {
+      const preyDistFromSpawn = Math.sqrt(prey.x * prey.x + prey.y * prey.y);
+      if (preyDistFromSpawn < CONFIG.SPAWN_SAFE_RADIUS) prey = null;
+    }
+
+    if (prey) {
+      tx = prey.x;
+      ty = prey.y;
+      if (!creature.isHunting && creature.huntCooldownTimer <= 0) {
+        creature.isHunting = true;
+        creature.huntTimer = 0;
+      }
+    }
+
+    return { x: tx, y: ty };
+  }
+
+  isPlayerHunting(creature) {
+    if (creature.isHunting) return true;
+    // Auto-hunt when near lower-level AI
+    const range = 400 * (creature.scale || 1);
+    for (const ai of this.aiCreatures) {
+      if (ai.type >= creature.type) continue;
+      const dx = ai.x - creature.x, dy = ai.y - creature.y;
+      if (dx * dx + dy * dy < range * range) {
+        if (!creature.isHunting && creature.huntCooldownTimer <= 0) {
+          creature.isHunting = true;
+          creature.huntTimer = 0;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // --- Evolution ---
+  advanceStage() {
+    if (this.birthAnimations.some(b => !b.isAI && !b.isAIEvolution)) return;
+    if (this.creatures.length === 0) return;
+
+    this.stageEnergy = 0;
+    this.evolutionStage++;
+
+    window.AudioMgr.advanceStage();
+    this._evoFlash();
+
+    if (this.evolutionStage >= 5) {
+      if (this.playerLevel >= SPECIES.length - 1) {
+        this.gameWin();
+        return;
+      }
+      this.evolveToNextSpecies();
+    } else {
+      if (this.playerLevel >= 3) this.upgradeCreatureComplexity();
+      else this.addCreature();
+    }
+    this.updateUI();
+  }
+
+  addCreature() {
+    if (this.creatures.length === 0) return;
+    const spec = SPECIES[this.playerLevel];
+    const scale = Math.pow(3, this.playerLevel / 7);
+    const avgX = this.creatures.reduce((s, c) => s + c.x, 0) / this.creatures.length;
+    const avgY = this.creatures.reduce((s, c) => s + c.y, 0) / this.creatures.length;
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 150 * scale;
+    const cls = CLASS_MAP[spec.cls];
+    const nc = new cls(avgX + Math.cos(ang) * dist, avgY + Math.sin(ang) * dist,
+      this.playerLevel, spec, false);
+    nc.velocity = { x: 0, y: 0 };
+    nc.flockId = this.creatures.length;
+    nc.scale = scale;
+    nc.groupId = 'player';
+    nc.wanderAngle = Math.random() * Math.PI * 2;
+    this.creatures.push(nc);
+  }
+
+  upgradeCreatureComplexity() {
+    this.creatures.forEach(c => {
+      c.complexityStage = this.evolutionStage;
+      c.upgradeComplexity(this.evolutionStage);
+    });
+  }
+
+  evolveToNextSpecies() {
+    if (this.playerLevel >= SPECIES.length - 1) return;
+    if (this.creatures.length === 0) return;
+
+    window.AudioMgr.evolve();
+    this._evoFlash();
+
+    const avgX = this.creatures.reduce((s, c) => s + c.x, 0) / this.creatures.length;
+    const avgY = this.creatures.reduce((s, c) => s + c.y, 0) / this.creatures.length;
+
+    this.creatures = [];
+    this.playerLevel++;
+    this.evolutionStage = 0;
+    if (this.playerLevel > this.score.maxLevel) this.score.maxLevel = this.playerLevel;
+    this.stageMaxEnergy = stageMaxEnergy(this.playerLevel);
+
+    this.createPlayer(avgX, avgY, true);
+  }
+
+  // --- AI Evolution ---
+  evolveAIGroup(gid) {
+    const group = this.aiGroups.get(gid);
+    if (!group) return;
+    const nextLevel = group.level + 1;
+    if (nextLevel >= SPECIES.length) return;
+
+    const members = this.aiCreatures.filter(c => c.groupId === gid);
+    if (members.length === 0) return;
+    const avgX = members.reduce((s, c) => s + c.x, 0) / members.length;
+    const avgY = members.reduce((s, c) => s + c.y, 0) / members.length;
+
+    this.aiCreatures = this.aiCreatures.filter(c => c.groupId !== gid);
+    this.aiGroups.delete(gid);
+    this.createAIGroup(nextLevel, avgX, avgY, 1, false);
+  }
+
+  // --- Game Over / Win ---
+  gameOver() {
+    if (this.hasExtraLife) {
+      // Use extra life - respawn at lower level
+      this.hasExtraLife = false;
+      if (this.playerLevel > 0) this.playerLevel--;
+      this.evolutionStage = 0;
+      this.stageEnergy = 0;
+      this.stageMaxEnergy = stageMaxEnergy(this.playerLevel);
+      this.createPlayer(this.camera.x, this.camera.y, true);
+      this.creatures.forEach(c => { c.invulnTimer = 3; });
+      this._evoFlash('rgba(200,180,30,0.2)');
+      return;
+    }
+
+    this.score.survivalTime = Math.floor((Date.now() - this.score.startTime) / 1000);
+    window.AudioMgr.gameOver();
+
+    const div = document.createElement('div');
+    div.id = 'gameOverScreen';
+    div.className = 'overlay-screen';
+    div.style.background = 'radial-gradient(ellipse at center, rgba(245,240,240,0.96), rgba(230,235,242,0.98))';
+    const m = Math.floor(this.score.survivalTime / 60);
+    const s = this.score.survivalTime % 60;
+    div.innerHTML = `
+      <div class="panel">
+        <h2 style="color:#c03030">GAME OVER</h2>
+        <div style="color:rgba(60,80,110,0.6);font-size:18px;margin-bottom:18px">你的所有生物都被消灭了</div>
+        <div class="stat-grid">
+          <span class="label">最高物种</span><span class="value">${SPECIES[this.score.maxLevel].name}</span>
+          <span class="label">存活时间</span><span class="value">${m}:${s.toString().padStart(2, '0')}</span>
+          <span class="label">击杀数</span><span class="value">${this.score.kills}</span>
+          <span class="label">总分</span><span class="value">${this.score.maxLevel * 1000 + this.score.survivalTime * 10 + this.score.kills * 100}</span>
+        </div>
+        <button id="retryBtn">再来一次</button>
+      </div>`;
+    document.body.appendChild(div);
+    document.getElementById('retryBtn').addEventListener('click', () => this.resetGame());
+  }
+
+  gameWin() {
+    this.score.survivalTime = Math.floor((Date.now() - this.score.startTime) / 1000);
+    window.AudioMgr.victory();
+
+    const div = document.createElement('div');
+    div.id = 'gameWinScreen';
+    div.className = 'overlay-screen';
+    div.style.background = 'radial-gradient(ellipse at center, rgba(240,248,242,0.96), rgba(230,235,242,0.98))';
+    const m = Math.floor(this.score.survivalTime / 60);
+    const s = this.score.survivalTime % 60;
+    div.innerHTML = `
+      <div class="panel">
+        <h2 style="color:#1a7a9c">VICTORY</h2>
+        <div style="color:rgba(40,60,90,0.65);font-size:18px">你已进化至终极形态</div>
+        <div style="color:#c03030;font-size:26px;margin:12px 0;letter-spacing:4px">利维坦 · 第五阶段</div>
+        <div class="stat-grid">
+          <span class="label">存活时间</span><span class="value">${m}:${s.toString().padStart(2, '0')}</span>
+          <span class="label">击杀数</span><span class="value">${this.score.kills}</span>
+          <span class="label">总分</span><span class="value">${7000 + this.score.survivalTime * 10 + this.score.kills * 100}</span>
+        </div>
+        <button id="replayBtn">再来一次</button>
+      </div>`;
+    document.body.appendChild(div);
+    document.getElementById('replayBtn').addEventListener('click', () => this.resetGame());
+  }
+
+  // --- Minimap ---
+  drawMinimap() {
+    const mm = this.mmCtx;
+    const w = this.mmCanvas.width, h = this.mmCanvas.height;
+    const half = this.worldSize / 2;
+
+    mm.fillStyle = 'rgba(235,240,248,0.85)';
+    mm.fillRect(0, 0, w, h);
+
+    // Map coordinates to minimap
+    const toMM = (x, y) => ({
+      x: (x / this.worldSize + 0.5) * w,
+      y: (y / this.worldSize + 0.5) * h
+    });
+
+    // Zones
+    this.zones.forEach(z => {
+      const p = toMM(z.x, z.y);
+      const r = (z.radius / this.worldSize) * w;
+      mm.fillStyle = z.type === 'vent' ? 'rgba(220,80,40,0.25)' :
+                     z.type === 'current' ? 'rgba(30,120,220,0.2)' : 'rgba(20,160,80,0.2)';
+      mm.beginPath();
+      mm.arc(p.x, p.y, Math.max(2, r), 0, Math.PI * 2);
+      mm.fill();
+    });
+
+    // Particle density (sampled)
+    if (this.frameCount % 30 === 0) {
+      this._mmParticleCache = [];
+      const gridSize = 20;
+      const density = new Map();
+      const step = Math.max(1, Math.floor(this.particles.length / 500));
+      for (let i = 0; i < this.particles.length; i += step) {
+        const p = this.particles[i];
+        const gx = Math.floor(p.x / (this.worldSize / gridSize));
+        const gy = Math.floor(p.y / (this.worldSize / gridSize));
+        const key = gx * 100 + gy;
+        density.set(key, (density.get(key) || 0) + 1);
+      }
+      density.forEach((count, key) => {
+        if (count > 2) {
+          const gx = Math.floor(key / 100);
+          const gy = key % 100;
+          this._mmParticleCache.push({ gx, gy, count });
+        }
+      });
+    }
+    if (this._mmParticleCache) {
+      this._mmParticleCache.forEach(({ gx, gy, count }) => {
+        const gridSize = 20;
+        const px = ((gx + 0.5) / gridSize + 0.5) * w;
+        const py = ((gy + 0.5) / gridSize + 0.5) * h;
+        const alpha = Math.min(0.6, count * 0.05);
+        mm.fillStyle = `rgba(42,90,140,${alpha})`;
+        mm.fillRect(px - 1, py - 1, 3, 3);
+      });
+    }
+
+    // AI creatures (by level color)
+    this.aiCreatures.forEach(c => {
+      if (c.isDying) return;
+      const p = toMM(c.x, c.y);
+      mm.fillStyle = c.type > this.playerLevel ? '#c03030' :
+                     c.type === this.playerLevel ? '#ff0' : '#888';
+      const size = c.type >= this.playerLevel ? 2 : 1;
+      mm.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+    });
+
+    // Player
+    this.creatures.forEach(c => {
+      const p = toMM(c.x, c.y);
+      mm.fillStyle = '#1a7a9c';
+      mm.beginPath();
+      mm.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      mm.fill();
+    });
+
+    // Shrinking circle on minimap (hide after circle is done)
+    if (this.circle.active && !this.circle.finished) {
+      const cr = (this.circle.radius / this.worldSize) * w;
+      mm.beginPath();
+      mm.arc(w / 2, h / 2, cr, 0, Math.PI * 2);
+      mm.strokeStyle = 'rgba(200,50,50,0.5)';
+      mm.lineWidth = 1.5;
+      mm.stroke();
+    }
+
+    // Camera viewport
+    const vw = (this.width / this.camera.zoom / this.worldSize) * w;
+    const vh = (this.height / this.camera.zoom / this.worldSize) * h;
+    const cp = toMM(this.camera.x, this.camera.y);
+    mm.strokeStyle = 'rgba(42,90,140,0.4)';
+    mm.lineWidth = 1;
+    mm.strokeRect(cp.x - vw / 2, cp.y - vh / 2, vw, vh);
+
+    // Border
+    mm.strokeStyle = 'rgba(42,90,140,0.2)';
+    mm.strokeRect(0, 0, w, h);
+  }
+
+  // --- Main Update ---
+  update() {
+    // Mobile joystick: map joystick displacement to mouseScreen
+    const joy = window.__joystick;
+    if (joy) {
+      if (joy.active) {
+        const sensitivity = 4.5;
+        this.mouseScreen.x = this.width / 2 + joy.dx * sensitivity;
+        this.mouseScreen.y = this.height / 2 + joy.dy * sensitivity;
+      } else {
+        // No joystick touch — creature drifts to standstill
+        this.mouseScreen.x = this.width / 2;
+        this.mouseScreen.y = this.height / 2;
+      }
+    }
+
+    this.frameCount++;
+
+    // Update shrinking circle
+    this.updateCircle();
+
+    // Update spatial hash
+    this.particleHash.clear();
+    this.particles.forEach(p => this.particleHash.insert(p));
+
+    // Zone effects
+    this._updateZones();
+
+    // Respawn
+    this.checkAndRespawnCreatures();
+
+    // Remove dead creatures
+    this.aiCreatures = this.aiCreatures.filter(c => !c.isDeathComplete());
+
+    // Remove temp clones
+    this.creatures = this.creatures.filter(c => {
+      if (c._tempClone) {
+        c._cloneLife--;
+        if (c._cloneLife <= 0) return false;
+      }
+      return !c.isDeathComplete();
+    });
+
+    // AI creature updates
+    const eatenByAI = new Set();
+    const aiKills = [];
+    const lowerAI = this.aiCreatures.filter(c => c.type < this.playerLevel && !c.isDying);
+
+    this.aiCreatures.forEach(c => {
+      if (!c || c.isDying || c.isFrozen) {
+        if (c && c.isFrozen) {
+          c.update(c.x, c.y, false, this.worldSize, []);
+        }
+        return;
+      }
+      // AI flocking
+      const target = this.updateFlocking(c, null, true);
+      let dx = target.x - c.x, dy = target.y - c.y;
+
+      // Add noise for low-level
+      if (c.type === 0) {
+        dx += (Math.random() - 0.5) * 30;
+        dy += (Math.random() - 0.5) * 30;
+      }
+
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const speed = (c.isHunting && c.config.huntSpeed || c.config.speed) * 100;
+      let vx, vy;
+      if (dist > speed) { vx = (dx / dist) * speed; vy = (dy / dist) * speed; }
+      else { vx = dx; vy = dy; }
+
+      c.x += vx; c.y += vy;
+
+      // World bounds
+      const half = this.worldSize / 2;
+      c.x = Math.max(-half, Math.min(half, c.x));
+      c.y = Math.max(-half, Math.min(half, c.y));
+
+      if (Math.sqrt(vx * vx + vy * vy) > 0.1) c.angle = Math.atan2(vy, vx);
+      c.velocity.x = vx; c.velocity.y = vy;
+
+      // Eat particles (using spatial hash)
+      const nearby = this.particleHash.query(c.x, c.y, 50 * (c.scale || 1));
+      const eaten = c.update(c.x, c.y, false, this.worldSize, nearby);
+      if (eaten && eaten.length > 0) {
+        eaten.forEach(p => {
+          if (p && !eatenByAI.has(p)) {
+            eatenByAI.add(p);
+            // Give energy to AI group
+            const group = this.aiGroups.get(c.groupId);
+            if (group) group.energy += (p.energy || 1);
+          }
+        });
+      }
+
+      // Attack other creatures
+      const attacked = c.detectAndAttackCreatures(
+        c.type > 0 ? [...this.creatures.filter(pc => pc.type < c.type), ...lowerAI.filter(a => a !== c && a.type < c.type)] : []
+      );
+      if (attacked && !aiKills.some(k => k.creature === attacked)) {
+        aiKills.push({ creature: attacked, killedByPlayer: false });
+      }
+    });
+
+    // AI group energy/evolution
+    for (const [gid, group] of this.aiGroups) {
+      if (group.isEvolving) continue;
+      const maxE = stageMaxEnergy(group.level);
+      if (group.energy >= maxE) {
+        group.energy = 0;
+        group.evolutionStage++;
+        if (group.evolutionStage >= 5) {
+          if (group.level < SPECIES.length - 1) {
+            this.evolveAIGroup(gid);
+          } else {
+            group.evolutionStage = 0;
+          }
+        }
+      }
+    }
+
+    if (this.creatures.length === 0) {
+      this.updateCamera();
+      return;
+    }
+
+    // Player creature updates
+    const mouseWorld = this.screenToWorld(this.mouseScreen.x, this.mouseScreen.y);
+    let playerEatenEnergy = 0;
+    const playerKills = [];
+
+    this.creatures.forEach(c => {
+      if (!c || !c.update) return;
+      if (c.isFrozen) {
+        c.update(c.x, c.y, false, this.worldSize, []);
+        return;
+      }
+
+      // Dash override
+      if (c.isDashing) {
+        const dashSpeed = CONFIG.DASH_SPEED * (c.scale || 1);
+        c.x += c.dashDirX * dashSpeed;
+        c.y += c.dashDirY * dashSpeed;
+      } else {
+        const target = this.updateFlocking(c, mouseWorld);
+        let dx = target.x - c.x, dy = target.y - c.y;
+
+        if (c.type === 0) {
+          dx += (Math.random() - 0.5) * 30;
+          dy += (Math.random() - 0.5) * 30;
+        }
+
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const speed = (this.isPlayerHunting(c) && c.config.huntSpeed || c.config.speed) * 100;
+        let vx, vy;
+        if (dist > speed) { vx = (dx / dist) * speed; vy = (dy / dist) * speed; }
+        else { vx = dx; vy = dy; }
+
+        c.x += vx; c.y += vy;
+
+        if (Math.sqrt(vx * vx + vy * vy) > 0.1) c.angle = Math.atan2(vy, vx);
+        c.velocity.x = vx; c.velocity.y = vy;
+      }
+
+      // World bounds
+      const half = this.worldSize / 2;
+      c.x = Math.max(-half, Math.min(half, c.x));
+      c.y = Math.max(-half, Math.min(half, c.y));
+
+      // Eat nearby particles
+      const nearby = this.particleHash.query(c.x, c.y, 60 * (c.scale || 1));
+      const eaten = c.update(c.x, c.y, false, this.worldSize, nearby);
+      if (eaten && eaten.length > 0) {
+        eaten.forEach(p => {
+          if (p) playerEatenEnergy += (p.energy || 1);
+        });
+        window.AudioMgr.eatParticle();
+      }
+
+      // Attack lower-level AI
+      const attacked = c.detectAndAttackCreatures(
+        this.aiCreatures.filter(ai => ai.type < c.type && !ai.isDying)
+      );
+      if (attacked && !playerKills.some(k => k.creature === attacked)) {
+        playerKills.push({ creature: attacked, killedByPlayer: true });
+      }
+    });
+
+    // Same-level bounce
+    this.creatures.forEach(pc => {
+      this.aiCreatures.forEach(ai => {
+        if (ai.type !== pc.type || ai.isDying) return;
+        const dx = pc.x - ai.x, dy = pc.y - ai.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const minD = CONFIG.SAME_LEVEL_BOUNCE * (pc.scale || 1);
+        if (d < minD && d > 0) {
+          const push = (minD - d) * 0.5;
+          pc.x += (dx / d) * push;
+          pc.y += (dy / d) * push;
+          ai.x -= (dx / d) * push * 0.3;
+          ai.y -= (dy / d) * push * 0.3;
+        }
+      });
+    });
+
+    // Process kills
+    [...playerKills, ...aiKills].forEach(({ creature, killedByPlayer }) => {
+      const deathParticles = creature.startDeath();
+      deathParticles.forEach(p => this.particles.push(p));
+
+      if (killedByPlayer) {
+        this.score.kills++;
+        window.AudioMgr.killCreature();
+        // Energy bonus for kills
+        const bonus = 5 * (creature.type + 1);
+        playerEatenEnergy += bonus;
+      }
+
+      // Give energy to AI group that killed
+      if (!killedByPlayer) {
+        // Find killer's group
+        this.aiCreatures.forEach(ai => {
+          if (ai.isDying) return;
+          const dx = ai.x - creature.x, dy = ai.y - creature.y;
+          if (dx * dx + dy * dy < 300 * 300) {
+            const group = this.aiGroups.get(ai.groupId);
+            if (group) group.energy += 5;
+          }
+        });
+      }
+    });
+
+    // Add player energy
+    if (playerEatenEnergy > 0 && this.stageEnergy < this.stageMaxEnergy) {
+      this.stageEnergy += playerEatenEnergy;
+      if (this.stageEnergy > this.stageMaxEnergy) this.stageEnergy = this.stageMaxEnergy;
+      this.updateUI();
+    }
+
+    // Check stage advance
+    const hasAnim = this.birthAnimations.some(b => !b.isAI && !b.isAIEvolution);
+    if (this.stageEnergy >= this.stageMaxEnergy && !hasAnim && this.creatures.length > 0) {
+      this.advanceStage();
+    }
+
+    // Check if all player creatures dead
+    if (this.creatures.length === 0 && !hasAnim) {
+      this.gameOver();
+    }
+
+    // Danger warning
+    this._checkDanger();
+
+    // Update particles (drift + keep inside circle)
+    if (this.frameCount % 3 === 0) {
+      const circleR = this.circle.active ? this.circle.radius : this.worldSize / 2;
+      const circleR2 = circleR * circleR;
+      this.particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        // Push particles back inside safe zone
+        const pd2 = p.x * p.x + p.y * p.y;
+        if (pd2 > circleR2 && pd2 > 0) {
+          const pd = Math.sqrt(pd2);
+          const pushBack = 0.02;
+          p.x -= (p.x / pd) * pushBack * (pd - circleR);
+          p.y -= (p.y / pd) * pushBack * (pd - circleR);
+        }
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+      });
+    }
+
+    // Remove eaten particles (by nearby array match - approximate)
+    // Particles eaten by player are removed from the main array via matching
+    // This is approximate since we use spatial hash subsets
+
+    // Remove eaten particles
+    this.particles = this.particles.filter(p => !p._eaten);
+
+    this.updateCamera();
+    this.updateUI();
+  }
+
+  _updateZones() {
+    this.zones.forEach(zone => {
+      if (zone.type === 'vent') {
+        zone.spawnTimer++;
+        if (zone.spawnTimer >= zone.spawnRate) {
+          zone.spawnTimer = 0;
+          // Spawn a few particles
+          for (let i = 0; i < 3; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = Math.random() * zone.radius;
+            this.particles.push({
+              x: zone.x + Math.cos(ang) * dist,
+              y: zone.y + Math.sin(ang) * dist,
+              size: Math.random() * 3 + 1.5,
+              energy: 1,
+              vx: (Math.random() - 0.5) * 0.5,
+              vy: (Math.random() - 0.5) * 0.5
+            });
+          }
+        }
+      }
+
+      if (zone.type === 'current') {
+        // Apply current force to nearby creatures
+        const allC = [...this.creatures, ...this.aiCreatures];
+        allC.forEach(c => {
+          const dx = c.x - zone.x, dy = c.y - zone.y;
+          if (dx * dx + dy * dy < zone.radius * zone.radius) {
+            c.x += Math.cos(zone.angle) * zone.strength;
+            c.y += Math.sin(zone.angle) * zone.strength;
+          }
+        });
+      }
+    });
+  }
+
+  _checkDanger() {
+    if (this.creatures.length === 0) return;
+    const cx = this.creatures[0].x, cy = this.creatures[0].y;
+    const range = CONFIG.DANGER_RANGE * (this.creatures[0].scale || 1);
+    let danger = false;
+    this.aiCreatures.forEach(ai => {
+      if (ai.type <= this.playerLevel) return;
+      const dx = ai.x - cx, dy = ai.y - cy;
+      if (dx * dx + dy * dy < range * range) danger = true;
+    });
+    if (danger && this.dangerTimer <= 0) {
+      window.AudioMgr.danger();
+      this.dangerTimer = 180; // 3 sec between warnings
+    }
+    if (this.dangerTimer > 0) this.dangerTimer--;
+  }
+
+  // --- Shrinking Circle (Battle Royale) ---
+  updateCircle() {
+    if (this.circle.finished) return;
+    const fc = this.frameCount;
+    const phase = this.circle.phases[this.circle.currentPhase];
+    if (!phase) { this.circle.finished = true; return; }
+
+    // Warning 10 seconds before shrink starts
+    const warnFrame = phase.startFrame - 600;
+    if (fc >= warnFrame && !this.circle.warningShown[this.circle.currentPhase]) {
+      this.circle.warningShown[this.circle.currentPhase] = true;
+      this.circle.active = true;
+    }
+
+    // During shrink
+    if (fc >= phase.startFrame && fc < phase.startFrame + phase.duration) {
+      const progress = (fc - phase.startFrame) / phase.duration;
+      this.circle.radius = phase.fromRadius + (phase.toRadius - phase.fromRadius) * progress;
+      this.circle.targetRadius = phase.toRadius;
+    }
+    // After shrink completes
+    else if (fc >= phase.startFrame + phase.duration) {
+      this.circle.radius = phase.toRadius;
+      this.circle.currentPhase++;
+      if (this.circle.currentPhase >= this.circle.phases.length) {
+        this.circle.finished = true;
+      }
+    }
+
+    // Apply damage to creatures outside circle every 30 frames (0.5s)
+    if (fc % 30 === 0) {
+      const r = this.circle.radius;
+      const r2 = r * r;
+
+      // Damage AI creatures outside circle - kill them
+      this.aiCreatures.forEach(c => {
+        if (c.isDying) return;
+        const d2 = c.x * c.x + c.y * c.y;
+        if (d2 > r2) {
+          const particles = c.startDeath();
+          particles.forEach(p => this.particles.push(p));
+        }
+      });
+
+      // Damage player creatures outside circle
+      this.creatures.forEach(c => {
+        if (c.isDying || c.invulnTimer > 0) return;
+        const d2 = c.x * c.x + c.y * c.y;
+        if (d2 > r2) {
+          // Player gets a warning flash first, then dies after 2 seconds outside
+          if (!c._outsideCircleTimer) c._outsideCircleTimer = 0;
+          c._outsideCircleTimer += 30;
+          if (c._outsideCircleTimer >= 120) { // 2 seconds grace
+            const particles = c.startDeath();
+            particles.forEach(p => this.particles.push(p));
+          }
+        } else {
+          c._outsideCircleTimer = 0;
+        }
+      });
+    }
+  }
+
+  drawCircle() {
+    if (!this.circle.active || this.circle.finished) return;
+    const r = this.circle.radius;
+
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+
+    // Draw the danger zone outside the circle (red tinted area)
+    // Use a large rect with circle cut out
+    const bigR = this.worldSize;
+    this.ctx.beginPath();
+    this.ctx.rect(-bigR, -bigR, bigR * 2, bigR * 2);
+    this.ctx.arc(0, 0, r, 0, Math.PI * 2, true); // cut out safe zone
+    this.ctx.closePath();
+
+    // Pulsing red overlay for danger zone
+    const pulse = 0.5 + 0.15 * Math.sin(this.frameCount * 0.03);
+    const isShrinking = !this.circle.finished && this.circle.currentPhase < this.circle.phases.length
+      && this.frameCount >= this.circle.phases[this.circle.currentPhase].startFrame;
+    const alpha = isShrinking ? 0.18 * pulse : 0.10;
+    this.ctx.fillStyle = `rgba(200,40,40,${alpha})`;
+    this.ctx.fill();
+
+    // Circle edge line
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+    const edgeAlpha = isShrinking ? 0.6 : 0.35;
+    this.ctx.strokeStyle = `rgba(200,50,50,${edgeAlpha})`;
+    this.ctx.lineWidth = isShrinking ? 4 / this.camera.zoom : 2 / this.camera.zoom;
+    this.ctx.stroke();
+
+    // Target circle (preview where it's shrinking to)
+    if (isShrinking) {
+      const phase = this.circle.phases[this.circle.currentPhase];
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, phase.toRadius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = 'rgba(200,50,50,0.2)';
+      this.ctx.lineWidth = 1.5 / this.camera.zoom;
+      this.ctx.setLineDash([20 / this.camera.zoom, 15 / this.camera.zoom]);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+    }
+
+    this.ctx.restore();
+  }
+
+  drawCircleUI() {
+    if (!this.circle.active && !this.circle.finished) return;
+    const fc = this.frameCount;
+
+    // Find relevant phase info for UI
+    let text = '';
+    let urgentColor = false;
+
+    if (!this.circle.finished && this.circle.currentPhase < this.circle.phases.length) {
+      const phase = this.circle.phases[this.circle.currentPhase];
+      if (fc < phase.startFrame) {
+        const secsLeft = Math.ceil((phase.startFrame - fc) / 60);
+        text = `⚠ 缩圈 ${this.circle.currentPhase + 1}/2 将在 ${secsLeft}s 后开始`;
+        if (secsLeft <= 5) urgentColor = true;
+      } else if (fc < phase.startFrame + phase.duration) {
+        const secsLeft = Math.ceil((phase.startFrame + phase.duration - fc) / 60);
+        text = `🔴 缩圈中... ${secsLeft}s`;
+        urgentColor = true;
+      }
+    } else if (this.circle.finished) {
+      // Show "circle complete" briefly
+      if (fc < this.circle.phases[1].startFrame + this.circle.phases[1].duration + 300) {
+        text = '✅ 缩圈完毕 - 自由模式';
+      }
+    }
+
+    if (!text) return;
+
+    // Draw at top center of screen
+    this.ctx.save();
+    this.ctx.font = 'bold 16px "Courier New", monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+
+    const metrics = this.ctx.measureText(text);
+    const pw = metrics.width + 36;
+    const ph = 36;
+    const px = this.width / 2 - pw / 2;
+    const py = 18;
+
+    // Background pill
+    this.ctx.fillStyle = urgentColor ? 'rgba(200,50,50,0.12)' : 'rgba(255,255,255,0.75)';
+    this.ctx.strokeStyle = urgentColor ? 'rgba(200,50,50,0.4)' : 'rgba(42,90,140,0.15)';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.roundRect(px, py, pw, ph, 10);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // Text
+    this.ctx.fillStyle = urgentColor ? '#c03030' : '#1a3a5c';
+    this.ctx.fillText(text, this.width / 2, py + ph / 2);
+    this.ctx.restore();
+  }
+
+  // --- Draw ---
+  draw() {
+    this.ctx.fillStyle = '#e8ecf2';
+    this.ctx.fillRect(0, 0, this.width, this.height);
+    if (!this.gameStarted) return;
+
+    const bounds = this.getScreenBounds(1.5);
+
+    // Draw zones (background)
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+
+    this.zones.forEach(zone => {
+      if (!this.isInScreen(zone, bounds)) return;
+      this.ctx.fillStyle = zone.color;
+      this.ctx.beginPath();
+      this.ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      // Vent glow
+      if (zone.type === 'vent') {
+        const grd = this.ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.radius);
+        grd.addColorStop(0, 'rgba(220,80,40,0.08)');
+        grd.addColorStop(1, 'rgba(220,80,40,0)');
+        this.ctx.fillStyle = grd;
+        this.ctx.beginPath();
+        this.ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      // Current arrow
+      if (zone.type === 'current') {
+        this.ctx.strokeStyle = 'rgba(30,120,220,0.18)';
+        this.ctx.lineWidth = 3;
+        const ax = zone.x + Math.cos(zone.angle) * zone.radius * 0.6;
+        const ay = zone.y + Math.sin(zone.angle) * zone.radius * 0.6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(zone.x - Math.cos(zone.angle) * zone.radius * 0.3,
+                       zone.y - Math.sin(zone.angle) * zone.radius * 0.3);
+        this.ctx.lineTo(ax, ay);
+        this.ctx.stroke();
+      }
+    });
+
+    this.ctx.restore();
+
+    // Shrinking circle overlay
+    this.drawCircle();
+
+    // Particles
+    this.drawParticles(bounds);
+
+    // Creatures
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+
+    this.creatures.forEach(c => {
+      if (c.isUpgrading || !this.isInScreen(c, bounds)) return;
+      if (c.scale) {
+        this.ctx.save();
+        this.ctx.translate(c.x, c.y);
+        this.ctx.scale(c.scale, c.scale);
+        this.ctx.translate(-c.x, -c.y);
+        c.draw(this.ctx);
+        this.ctx.restore();
+      } else {
+        c.draw(this.ctx);
+      }
+    });
+
+    this.aiCreatures.forEach(c => {
+      if (!this.isInScreen(c, bounds)) return;
+      if (c.scale) {
+        this.ctx.save();
+        this.ctx.translate(c.x, c.y);
+        this.ctx.scale(c.scale, c.scale);
+        this.ctx.translate(-c.x, -c.y);
+        c.draw(this.ctx);
+        this.ctx.restore();
+      } else {
+        c.draw(this.ctx);
+      }
+    });
+
+    this.ctx.restore();
+
+    // Danger indicator
+    if (this.dangerTimer > 150) {
+      const alpha = ((this.dangerTimer - 150) / 30) * 0.3;
+      this.ctx.fillStyle = `rgba(200,30,30,${alpha})`;
+      this.ctx.fillRect(0, 0, this.width, 3);
+      this.ctx.fillRect(0, this.height - 3, this.width, 3);
+      this.ctx.fillRect(0, 0, 3, this.height);
+      this.ctx.fillRect(this.width - 3, 0, 3, this.height);
+    }
+
+    // Minimap
+    // Circle status UI
+    this.drawCircleUI();
+
+    if (this.frameCount % 5 === 0) this.drawMinimap();
+  }
+
+  drawParticles(bounds) {
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+
+    // Draw visible particles
+    const step = this.camera.zoom < 0.3 ? 4 : this.camera.zoom < 0.5 ? 2 : 1;
+    for (let i = 0; i < this.particles.length; i += step) {
+      const p = this.particles[i];
+      if (!p) continue;
+      if (p.x < bounds.minX || p.x > bounds.maxX || p.y < bounds.minY || p.y > bounds.maxY) continue;
+
+      this.ctx.fillStyle = `rgba(42,90,140,${0.25 + p.size * 0.12})`;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+    this.ctx.restore();
+  }
+
+  // --- Main Loop ---
+  animate() {
+    if (this.gameStarted) {
+      this.update();
+      this.draw();
+    } else if (this.previewMode) {
+      this.updatePreview();
+      this.drawPreview();
+    }
+    requestAnimationFrame(() => this.animate());
+  }
+
+  updatePreview() {
+    this.frameCount++;
+    // Slowly drift camera
+    this.camera.x = Math.sin(this.frameCount * 0.001) * 200;
+    this.camera.y = Math.cos(this.frameCount * 0.0007) * 150;
+    // Update showcase creature
+    this._updateShowcase();
+    // Update AI creatures (simplified - just movement, no hunting)
+    this.particleHash.clear();
+    this.particles.forEach(p => this.particleHash.insert(p));
+    this.aiCreatures.forEach(c => {
+      if (c.isDying) return;
+      // Simple wander
+      c.wanderTimer++;
+      if (c.wanderTimer > 120) { c.wanderAngle += (Math.random() - 0.5) * 0.8; c.wanderTimer = 0; }
+      const sc = c.scale || 1;
+      const wx = c.x + Math.cos(c.wanderAngle) * 200 * sc;
+      const wy = c.y + Math.sin(c.wanderAngle) * 200 * sc;
+      c.update(wx, wy, false, this.worldSize, []);
+    });
+    // Drift particles gently
+    if (this.frameCount % 3 === 0) {
+      this.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.vy *= 0.99; });
+    }
+  }
+
+  drawPreview() {
+    this.ctx.fillStyle = '#e8ecf2';
+    this.ctx.fillRect(0, 0, this.width, this.height);
+    const bounds = this.getScreenBounds(1.5);
+
+    // Draw zones
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+    this.zones.forEach(zone => {
+      if (!this.isInScreen(zone, bounds)) return;
+      this.ctx.fillStyle = zone.color;
+      this.ctx.beginPath();
+      this.ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+    this.ctx.restore();
+
+    // Particles
+    this.drawParticles(bounds);
+
+    // AI creatures
+    this.ctx.save();
+    this.ctx.translate(this.width / 2, this.height / 2);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
+    this.ctx.translate(-this.camera.x, -this.camera.y);
+    this.aiCreatures.forEach(c => {
+      if (c.isDying || !this.isInScreen(c, bounds)) return;
+      if (c.scale) {
+        this.ctx.save();
+        this.ctx.translate(c.x, c.y);
+        this.ctx.scale(c.scale, c.scale);
+        this.ctx.translate(-c.x, -c.y);
+        c.draw(this.ctx);
+        this.ctx.restore();
+      } else {
+        c.draw(this.ctx);
+      }
+    });
+    // Showcase creature (draw last, on top)
+    this._drawShowcase(bounds);
+    this.ctx.restore();
+  }
+}
+
+// Start
+const __game = new Game();
+window._gameEngine = __game;
+// ============================================================
+// mobile-adapter.js — WeChat iOS (iPhone 16/17) optimization
+// Virtual joystick + touch action buttons + iOS safe area
+// ============================================================
+
+(function() {
+  'use strict';
+
+  // --- Detect mobile ---
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // Expose for game engine to check
+  window.__isMobile = isMobile;
+
+  if (!isMobile) return; // Desktop — skip all mobile adaptation
+
+  // --- Prevent iOS rubber-banding and pinch zoom ---
+  document.addEventListener('touchmove', e => {
+    if (e.target.closest('#startOverlay')) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  // Prevent double-tap zoom on iOS
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  // --- Update viewport meta for iOS notch + no zoom ---
+  let vpMeta = document.querySelector('meta[name="viewport"]');
+  if (vpMeta) {
+    vpMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+  }
+
+  // --- iOS full-screen-like experience ---
+  document.body.style.overscrollBehavior = 'none';
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
+  document.body.style.height = '100%';
+  document.body.style.top = '0';
+  document.body.style.left = '0';
+
+  // --- Inject mobile CSS ---
+  const css = document.createElement('style');
+  css.textContent = `
+    /* ===== iOS safe area ===== */
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+
+    /* ===== Mobile HUD shrink ===== */
+    #ui {
+      top: calc(8px + var(--sat)) !important;
+      left: calc(8px + var(--sal)) !important;
+      width: 200px !important;
+      padding: 8px 12px !important;
+      border-radius: 10px !important;
+      opacity: 0.82;
+    }
+    #ui h1 { font-size: 14px !important; }
+    #ui .desc { font-size: 10px !important; }
+    #ui .stats { font-size: 11px !important; gap: 1px 8px !important; }
+    #energySection { margin-top: 6px !important; padding-top: 6px !important; }
+    #energyBarBg { height: 16px !important; }
+    #energyLabel { font-size: 9px !important; }
+    #energyText { font-size: 9px !important; }
+
+    /* ===== Mobile minimap ===== */
+    #minimap {
+      width: 100px !important; height: 100px !important;
+      bottom: calc(16px + var(--sab)) !important;
+      right: calc(10px + var(--sar)) !important;
+      opacity: 0.7;
+      border-radius: 10px !important;
+    }
+
+    /* Hide desktop skill bar and info */
+    #skillBar { display: none !important; }
+    #info { display: none !important; }
+
+    /* ===== Mobile start screen ===== */
+    #titleEnglish { font-size: 36px !important; letter-spacing: 5px !important; }
+    #titleChinese { font-size: 20px !important; letter-spacing: 10px !important; }
+    #startButton {
+      font-size: 16px !important; padding: 12px 40px !important;
+      border-radius: 40px !important;
+    }
+
+    /* ===== Game over panels ===== */
+    .overlay-screen .panel {
+      padding: 24px 24px !important;
+      margin: 0 16px !important;
+      max-width: 90vw;
+    }
+    .overlay-screen h2 { font-size: 28px !important; }
+    .overlay-screen .stat-grid { font-size: 13px !important; gap: 4px 16px !important; }
+    .overlay-screen button { font-size: 16px !important; padding: 10px 32px !important; }
+
+    /* ===== VIRTUAL JOYSTICK ===== */
+    #joystickZone {
+      position: fixed;
+      left: 0; bottom: 0;
+      width: 55vw;
+      height: 55vh;
+      z-index: 800;
+      touch-action: none;
+    }
+    #joystickBase {
+      position: fixed;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(42,90,140,0.06);
+      border: 2px solid rgba(42,90,140,0.12);
+      display: none;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+    #joystickThumb {
+      position: fixed;
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(42,130,180,0.45), rgba(42,130,180,0.2));
+      border: 2px solid rgba(42,130,180,0.35);
+      display: none;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    /* ===== ACTION BUTTONS ===== */
+    #mobileActions {
+      position: fixed;
+      right: calc(14px + var(--sar));
+      bottom: calc(150px + var(--sab));
+      z-index: 800;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+    }
+    #mobileActions.visible { display: flex; }
+
+    .mobile-btn {
+      width: 66px; height: 66px;
+      border-radius: 50%;
+      border: 2px solid rgba(42,90,140,0.25);
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s, background 0.08s;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      position: relative;
+    }
+    .mobile-btn:active, .mobile-btn.pressed {
+      transform: scale(0.9);
+      background: rgba(42,130,180,0.2);
+      border-color: rgba(42,130,180,0.5);
+    }
+    .mobile-btn .btn-icon { font-size: 24px; line-height: 1; }
+    .mobile-btn .btn-label {
+      font-size: 9px; color: rgba(40,60,90,0.55); margin-top: 1px;
+      font-family: 'Courier New', monospace; letter-spacing: 0.5px;
+    }
+    .mobile-btn.on-cooldown { opacity: 0.45; }
+    .mobile-btn .cd-text {
+      position: absolute; font-size: 15px; font-weight: bold;
+      color: #2a5a8c; display: none;
+    }
+    .mobile-btn.on-cooldown .cd-text { display: block; }
+    .mobile-btn.on-cooldown .btn-icon { opacity: 0.25; }
+    .mobile-btn.on-cooldown .btn-label { opacity: 0.25; }
+  `;
+  document.head.appendChild(css);
+
+  // --- Create joystick DOM ---
+  const joystickZone = document.createElement('div');
+  joystickZone.id = 'joystickZone';
+  joystickZone.innerHTML = '<div id="joystickBase"></div><div id="joystickThumb"></div>';
+  document.body.appendChild(joystickZone);
+
+  const jBase = document.getElementById('joystickBase');
+  const jThumb = document.getElementById('joystickThumb');
+
+  // --- Create action buttons ---
+  const actionsDiv = document.createElement('div');
+  actionsDiv.id = 'mobileActions';
+  actionsDiv.innerHTML = `
+    <div class="mobile-btn" id="btnSkill">
+      <span class="btn-icon">⚡</span>
+      <span class="btn-label">技能</span>
+      <span class="cd-text" id="btnSkillCd"></span>
+    </div>
+    <div class="mobile-btn" id="btnDash">
+      <span class="btn-icon">💨</span>
+      <span class="btn-label">冲刺</span>
+      <span class="cd-text" id="btnDashCd"></span>
+    </div>
+  `;
+  document.body.appendChild(actionsDiv);
+
+  // ============================
+  // Joystick State
+  // ============================
+  const jState = {
+    active: false,
+    touchId: null,
+    baseX: 0, baseY: 0,
+    dx: 0, dy: 0,
+    maxRadius: 52
+  };
+
+  // Expose joystick state globally so game engine can read it
+  window.__joystick = jState;
+
+  joystickZone.addEventListener('touchstart', e => {
+    if (jState.active) return;
+    const t = e.changedTouches[0];
+    jState.active = true;
+    jState.touchId = t.identifier;
+    jState.baseX = t.clientX;
+    jState.baseY = t.clientY;
+    jState.dx = 0;
+    jState.dy = 0;
+
+    jBase.style.display = 'block';
+    jBase.style.left = t.clientX + 'px';
+    jBase.style.top = t.clientY + 'px';
+    jThumb.style.display = 'block';
+    jThumb.style.left = t.clientX + 'px';
+    jThumb.style.top = t.clientY + 'px';
+    e.preventDefault();
+  }, { passive: false });
+
+  joystickZone.addEventListener('touchmove', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier !== jState.touchId) continue;
+      let dx = t.clientX - jState.baseX;
+      let dy = t.clientY - jState.baseY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > jState.maxRadius) {
+        dx = (dx / dist) * jState.maxRadius;
+        dy = (dy / dist) * jState.maxRadius;
+      }
+      jState.dx = dx;
+      jState.dy = dy;
+      jThumb.style.left = (jState.baseX + dx) + 'px';
+      jThumb.style.top = (jState.baseY + dy) + 'px';
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  const endJoystick = e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === jState.touchId) {
+        jState.active = false;
+        jState.touchId = null;
+        jState.dx = 0;
+        jState.dy = 0;
+        jBase.style.display = 'none';
+        jThumb.style.display = 'none';
+      }
+    }
+  };
+  joystickZone.addEventListener('touchend', endJoystick, { passive: false });
+  joystickZone.addEventListener('touchcancel', endJoystick, { passive: false });
+
+  // ============================
+  // Action Buttons
+  // ============================
+  const btnDash = document.getElementById('btnDash');
+  const btnSkill = document.getElementById('btnSkill');
+
+  btnDash.addEventListener('touchstart', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    btnDash.classList.add('pressed');
+    if (window._gameEngine) window._gameEngine.playerDash();
+  }, { passive: false });
+  btnDash.addEventListener('touchend', () => btnDash.classList.remove('pressed'));
+
+  btnSkill.addEventListener('touchstart', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    btnSkill.classList.add('pressed');
+    if (window._gameEngine) window._gameEngine.playerSkill();
+  }, { passive: false });
+  btnSkill.addEventListener('touchend', () => btnSkill.classList.remove('pressed'));
+
+  // ============================
+  // Show/hide mobile actions with game state
+  // ============================
+  function checkVisibility() {
+    const mobileActions = document.getElementById('mobileActions');
+    const engine = window._gameEngine;
+    if (engine && engine.gameStarted && !engine.gameOver && !engine.winState) {
+      mobileActions.classList.add('visible');
+    } else {
+      mobileActions.classList.remove('visible');
+    }
+    requestAnimationFrame(checkVisibility);
+  }
+  requestAnimationFrame(checkVisibility);
+
+  // ============================
+  // Update cooldown display on buttons
+  // ============================
+  function updateCooldowns() {
+    const engine = window._gameEngine;
+    if (!engine || !engine.creatures || engine.creatures.length === 0) {
+      requestAnimationFrame(updateCooldowns);
+      return;
+    }
+    const leader = engine.creatures[0];
+
+    // Dash
+    if (leader.dashCooldown > 0) {
+      btnDash.classList.add('on-cooldown');
+      document.getElementById('btnDashCd').textContent = Math.ceil(leader.dashCooldown / 60) + 's';
+    } else {
+      btnDash.classList.remove('on-cooldown');
+    }
+
+    // Skill
+    if (leader.skillCooldown > 0) {
+      btnSkill.classList.add('on-cooldown');
+      document.getElementById('btnSkillCd').textContent = Math.ceil(leader.skillCooldown / 60) + 's';
+    } else {
+      btnSkill.classList.remove('on-cooldown');
+    }
+
+    requestAnimationFrame(updateCooldowns);
+  }
+  requestAnimationFrame(updateCooldowns);
+
+  // ============================
+  // WeChat + iOS audio unlock
+  // ============================
+  function unlockAudio() {
+    if (window.AudioMgr && window.AudioMgr.ctx) {
+      window.AudioMgr.ctx.resume().catch(() => {});
+      // Play a tiny silent buffer
+      try {
+        const ctx = window.AudioMgr.ctx;
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch(e) {}
+    }
+    document.removeEventListener('touchstart', unlockAudio);
+  }
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+
+  if (isWeChat) {
+    document.addEventListener('WeixinJSBridgeReady', () => {
+      document.addEventListener('touchstart', unlockAudio, { once: true });
+    });
+  }
+
+  console.log('[MobileAdapter] Ready: mobile=' + isMobile + ' WeChat=' + isWeChat + ' iOS=' + isIOS);
+})();
+
+</script>
+</body>
+</html>
