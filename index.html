@@ -764,97 +764,60 @@ class Creature {
   draw(ctx) { /* Override */ }
 }
 // ============================================================
-// Species I: Photon (光子) - Tiny, fast, twitchy
+// Species I: Ember (烬火) - Flickering flame particle
 // ============================================================
-class Photon extends Creature {
+class Ember extends Creature {
   setupCreature() {
-    this.chains.push(new Chain(4, 5, 6, 1, 0.8));
+    this.chains.push(new Chain(6, 4, 5, 1, 0.75));
+    this.props.flicker = 0;
   }
   updateChains() {
+    this.props.flicker += 0.15;
     this.chains[0].update(this.x, this.y);
   }
   draw(ctx) {
     if (this.isDying) return;
     const seg = this.chains[0].segments[0];
     ctx.globalAlpha = this.getStateAlpha();
-    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 25;
     ctx.shadowColor = this.getGlowColor();
-    ctx.fillStyle = this.getColor();
-    const r = 4 + Math.random() * 2 + this.attackPhase * 10 + (this.isHunting ? 3 : 0);
+    // Outer shimmer ring
+    const shimmer = Math.sin(this.props.flicker) * 3;
+    ctx.strokeStyle = this.getGlowColor();
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.3 * this.getStateAlpha();
     ctx.beginPath();
-    ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (this.isHunting) {
-      const p = (this.huntTimer % 30) / 30;
-      ctx.strokeStyle = this.getGlowColor();
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = (1 - p) * 0.5 * this.getStateAlpha();
-      ctx.beginPath();
-      ctx.arc(seg.x, seg.y, r + p * 15, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = this.getStateAlpha();
-    }
-    this.chains[0].draw(ctx, this.getColor(), 2);
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-  }
-}
-
-// ============================================================
-// Species II: Dart (飞梭) - Stiff dart with thrust
-// ============================================================
-class Dart extends Creature {
-  setupCreature() {
-    this.chains.push(new Chain(8, 8, 10, 2, 0.9));
-    this.thrustAngle = 0;
-    this.thrustDistance = 0;
-  }
-  updateChains() {
-    if (this.attackPhase > 0) {
-      if (this.attackPhase < 0.1) this.thrustAngle = this.angle;
-      let target = 0;
-      if (this.attackPhase < 0.3) target = (this.attackPhase / 0.3) * 25;
-      else if (this.attackPhase < 0.6) target = 25;
-      else target = 25 * (1 - (this.attackPhase - 0.6) / 0.4);
-      this.thrustDistance += (target - this.thrustDistance) * 0.3;
-    } else {
-      this.thrustDistance *= 0.8;
-    }
-    const hx = this.x + Math.cos(this.thrustAngle) * this.thrustDistance;
-    const hy = this.y + Math.sin(this.thrustAngle) * this.thrustDistance;
-    this.chains[0].update(hx, hy);
-  }
-  draw(ctx) {
-    if (this.isDying) return;
-    const seg0 = this.chains[0].segments[0];
-    const chain = this.chains[0];
-    ctx.globalAlpha = this.getStateAlpha();
-    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
-    ctx.shadowColor = this.getGlowColor();
-    ctx.strokeStyle = this.getColor();
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(seg0.x, seg0.y);
-    for (let i = 1; i < chain.segments.length; i++) {
-      ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
-    }
+    ctx.arc(seg.x, seg.y, 10 + shimmer, 0, Math.PI * 2);
     ctx.stroke();
-    // Head dart shape
-    for (let i = 1; i < Math.min(4, chain.segments.length); i++) {
-      const s = chain.segments[i];
+    ctx.globalAlpha = this.getStateAlpha();
+    // Core flame — diamond shape
+    const r = 5 + Math.sin(this.props.flicker * 1.3) * 2 + this.attackPhase * 8;
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.moveTo(seg.x, seg.y - r * 1.4);
+    ctx.lineTo(seg.x + r * 0.7, seg.y);
+    ctx.lineTo(seg.x, seg.y + r * 0.5);
+    ctx.lineTo(seg.x - r * 0.7, seg.y);
+    ctx.closePath();
+    ctx.fill();
+    // Spark trail
+    for (let i = 1; i < this.chains[0].segments.length; i++) {
+      const s = this.chains[0].segments[i];
+      const a = 1 - i / this.chains[0].segments.length;
+      ctx.globalAlpha = a * 0.6 * this.getStateAlpha();
+      ctx.fillStyle = this.getGlowColor();
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius * 0.8, 0, Math.PI * 2);
-      ctx.fillStyle = this.getColor();
+      ctx.arc(s.x + (Math.random()-0.5)*2, s.y + (Math.random()-0.5)*2, 2 * a, 0, Math.PI * 2);
       ctx.fill();
     }
     // Hunting pulse
     if (this.isHunting) {
-      const p = (this.huntTimer % 20) / 20;
+      const p = (this.huntTimer % 25) / 25;
       ctx.strokeStyle = this.getGlowColor();
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = (1 - p) * 0.3 * this.getStateAlpha();
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = (1 - p) * 0.5 * this.getStateAlpha();
       ctx.beginPath();
-      ctx.arc(seg0.x, seg0.y, 15 + p * 20, 0, Math.PI * 2);
+      ctx.arc(seg.x, seg.y, r + p * 18, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.shadowBlur = 0;
@@ -863,21 +826,89 @@ class Dart extends Creature {
 }
 
 // ============================================================
-// Species III: Pulse (水母) - Radial tentacles, pulsing
+// Species II: Needle (针鱼) - Crystal needle with prismatic trail
 // ============================================================
-class Pulse extends Creature {
+class Needle extends Creature {
   setupCreature() {
-    for (let i = 0; i < 5; i++) {
-      this.chains.push(new Chain(12, 6, 4, 1, 0.4));
+    this.chains.push(new Chain(10, 7, 8, 1, 0.88));
+    this.props.trailPhase = 0;
+  }
+  updateChains() {
+    this.props.trailPhase += 0.1;
+    const thrust = this.attackPhase * 20;
+    const hx = this.x + Math.cos(this.angle) * thrust;
+    const hy = this.y + Math.sin(this.angle) * thrust;
+    this.chains[0].update(hx, hy);
+  }
+  draw(ctx) {
+    if (this.isDying) return;
+    const chain = this.chains[0];
+    const segs = chain.segments;
+    ctx.globalAlpha = this.getStateAlpha();
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowColor = this.getGlowColor();
+    // Needle body — tapered line with faceted segments
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(segs[0].x, segs[0].y);
+    for (let i = 1; i < segs.length; i++) {
+      ctx.lineTo(segs[i].x, segs[i].y);
+    }
+    ctx.stroke();
+    // Faceted segments — alternating small diamonds
+    for (let i = 0; i < segs.length; i += 2) {
+      const s = segs[i];
+      const sz = s.radius * 0.5 * (1 - i / segs.length);
+      if (sz < 1) continue;
+      const a = s.angle || 0;
+      ctx.fillStyle = this.getColor();
+      ctx.beginPath();
+      ctx.moveTo(s.x + Math.cos(a) * sz, s.y + Math.sin(a) * sz);
+      ctx.lineTo(s.x + Math.cos(a + Math.PI/2) * sz * 0.6, s.y + Math.sin(a + Math.PI/2) * sz * 0.6);
+      ctx.lineTo(s.x + Math.cos(a + Math.PI) * sz, s.y + Math.sin(a + Math.PI) * sz);
+      ctx.lineTo(s.x + Math.cos(a - Math.PI/2) * sz * 0.6, s.y + Math.sin(a - Math.PI/2) * sz * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Tip glow
+    ctx.fillStyle = this.getGlowColor();
+    ctx.beginPath();
+    ctx.arc(segs[0].x, segs[0].y, 3 + this.attackPhase * 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Hunting shimmer
+    if (this.isHunting) {
+      const p = (this.huntTimer % 18) / 18;
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = (1 - p) * 0.4 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.arc(segs[0].x, segs[0].y, 12 + p * 22, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// Species III: Bloom (花蕊) - Flower petals that pulse open/close
+// ============================================================
+class Bloom extends Creature {
+  setupCreature() {
+    this.props.petalPhase = 0;
+    for (let i = 0; i < 6; i++) {
+      this.chains.push(new Chain(10, 5, 3, 1, 0.45));
     }
   }
   updateChains() {
-    this.centerCollision = { x: this.x, y: this.y, radius: 20 };
-    const pulse = Math.sin(this.timer * 0.1) * 10 * (1 - this.attackPhase) + this.attackPhase * -20;
+    this.props.petalPhase += 0.08;
+    this.centerCollision = { x: this.x, y: this.y, radius: 18 };
+    const openness = Math.sin(this.props.petalPhase) * 12 * (1 - this.attackPhase) + this.attackPhase * -18;
     for (let i = 0; i < this.chains.length; i++) {
-      const ang = (Math.PI * 2 / 5) * i + this.timer * 0.02;
-      const tx = this.x + Math.cos(ang) * (20 + pulse);
-      const ty = this.y + Math.sin(ang) * (20 + pulse);
+      const ang = (Math.PI * 2 / 6) * i + this.timer * 0.015;
+      const tx = this.x + Math.cos(ang) * (22 + openness);
+      const ty = this.y + Math.sin(ang) * (22 + openness);
       this.chains[i].update(tx, ty);
     }
   }
@@ -886,9 +917,34 @@ class Pulse extends Creature {
     ctx.globalAlpha = this.getStateAlpha();
     ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
     ctx.shadowColor = this.getGlowColor();
-    // Bell
+    // Petals — teardrop shapes connecting center to chain tips
+    for (let i = 0; i < this.chains.length; i++) {
+      const tip = this.chains[i].segments[0];
+      const mid = this.chains[i].segments[Math.floor(this.chains[i].segments.length / 2)];
+      // Petal outline
+      ctx.fillStyle = this.getColor();
+      ctx.globalAlpha = 0.2 * this.getStateAlpha();
+      ctx.beginPath();
+      const ang = Math.atan2(tip.y - this.y, tip.x - this.x);
+      const perpX = Math.cos(ang + Math.PI / 2) * 6;
+      const perpY = Math.sin(ang + Math.PI / 2) * 6;
+      ctx.moveTo(this.x, this.y);
+      ctx.quadraticCurveTo(mid.x + perpX, mid.y + perpY, tip.x, tip.y);
+      ctx.quadraticCurveTo(mid.x - perpX, mid.y - perpY, this.x, this.y);
+      ctx.fill();
+      ctx.globalAlpha = this.getStateAlpha();
+      // Petal vein (chain line)
+      this.chains[i].draw(ctx, this.getColor(), 1.2);
+    }
+    // Center pistil
+    ctx.fillStyle = this.getGlowColor();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Outer ring connecting petal tips
     ctx.strokeStyle = this.getColor();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.4 * this.getStateAlpha();
     ctx.beginPath();
     for (let i = 0; i < this.chains.length; i++) {
       const s = this.chains[i].segments[0];
@@ -897,94 +953,90 @@ class Pulse extends Creature {
     }
     ctx.closePath();
     ctx.stroke();
-    const bellColor = this.getColor();
-    ctx.fillStyle = bellColor.startsWith('#') 
-      ? bellColor + '26'  // hex + alpha (26 = 0.15 * 255 in hex, approx)
-      : bellColor.replace(')', ',0.15)').replace('rgb', 'rgba');
-    ctx.fill();
-    // Tentacles
-    for (let i = 0; i < this.chains.length; i++) {
-      this.chains[i].draw(ctx, this.getColor(), 1.5);
-    }
-    // Center
-    ctx.fillStyle = this.getColor();
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
   }
 }
 
 // ============================================================
-// Species IV: Serpent (蛇刺) - Long sinusoidal body
+// Species IV: Ribbon (绸蛇) - Flowing silk ribbon with gradient
 // ============================================================
-class Serpent extends Creature {
+class Ribbon extends Creature {
   setupCreature() {
-    const segs = 30 + (this.complexityStage || 0) * 3;
-    const dist = 6 + (this.complexityStage || 0) * 2;
-    this.chains.push(new Chain(segs, dist, 14, 3, 0.3));
+    const segs = 35 + (this.complexityStage || 0) * 4;
+    const dist = 5 + (this.complexityStage || 0) * 1;
+    this.chains.push(new Chain(segs, dist, 10, 2, 0.25));
+    this.props.undulate = 0;
   }
   updateChains() {
+    this.props.undulate += 0.06;
     this.chains[0].update(this.x, this.y);
   }
   upgradeComplexity(stage) {
     this.complexityStage = stage;
-    const segs = 30 + stage * 3;
-    const dist = 6 + stage * 2;
-    this.chains[0] = new Chain(segs, dist, 14, 3, 0.3);
+    const segs = 35 + stage * 4;
+    const dist = 5 + stage * 1;
+    this.chains[0] = new Chain(segs, dist, 10, 2, 0.25);
   }
   draw(ctx) {
     if (this.isDying) return;
     const chain = this.chains[0];
+    const segs = chain.segments;
     ctx.globalAlpha = this.getStateAlpha();
-    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
+    ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 15;
     ctx.shadowColor = this.getGlowColor();
-    // Hunting aura
+    // Hunting outer glow
     if (this.isHunting) {
-      const p = (this.huntTimer % 20) / 20;
+      const p = (this.huntTimer % 22) / 22;
       ctx.strokeStyle = this.getGlowColor();
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = (1 - p) * 0.3 * this.getStateAlpha();
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = (1 - p) * 0.25 * this.getStateAlpha();
       ctx.beginPath();
-      ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
-      for (let i = 1; i < chain.segments.length; i++) ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
+      ctx.moveTo(segs[0].x, segs[0].y);
+      for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
       ctx.stroke();
       ctx.globalAlpha = this.getStateAlpha();
-      ctx.strokeStyle = this.getColor();
     }
-    // Body
-    ctx.strokeStyle = this.getColor();
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
-    for (let i = 1; i < chain.segments.length; i++) {
-      const s = chain.segments[i];
-      ctx.lineWidth = Math.max(1, 3 * (1 - i / chain.segments.length));
-      ctx.lineTo(s.x, s.y);
-    }
-    ctx.stroke();
-    // Barbs
-    for (let i = 2; i < chain.segments.length; i += 4) {
-      const s = chain.segments[i];
-      const barbLen = s.radius * 1.5 + this.attackPhase * 5;
-      const ang = s.angle + Math.PI / 2;
-      ctx.strokeStyle = this.getColor();
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x + Math.cos(ang) * barbLen, s.y + Math.sin(ang) * barbLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - Math.cos(ang) * barbLen, s.y - Math.sin(ang) * barbLen);
-      ctx.stroke();
-    }
-    // Head
-    const head = chain.segments[0];
+    // Ribbon body — wide ribbon with perpendicular width
+    const ribbonWidth = 6;
     ctx.fillStyle = this.getColor();
     ctx.beginPath();
-    ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+    // Top edge
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const w = ribbonWidth * (1 - i / segs.length * 0.7);
+      const wave = Math.sin(this.props.undulate + i * 0.3) * w * 0.4;
+      const perp = (s.angle || 0) + Math.PI / 2;
+      const px = s.x + Math.cos(perp) * (w + wave);
+      const py = s.y + Math.sin(perp) * (w + wave);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    // Bottom edge (reverse)
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const s = segs[i];
+      const w = ribbonWidth * (1 - i / segs.length * 0.7);
+      const wave = Math.sin(this.props.undulate + i * 0.3) * w * 0.4;
+      const perp = (s.angle || 0) + Math.PI / 2;
+      const px = s.x - Math.cos(perp) * (w + wave);
+      const py = s.y - Math.sin(perp) * (w + wave);
+      ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 0.35 * this.getStateAlpha();
+    ctx.fill();
+    ctx.globalAlpha = this.getStateAlpha();
+    // Center spine
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(segs[0].x, segs[0].y);
+    for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
+    ctx.stroke();
+    // Head — rounded
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(segs[0].x, segs[0].y, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
@@ -992,17 +1044,18 @@ class Serpent extends Creature {
 }
 
 // ============================================================
-// Species V: Pincer (双螯) - Heavy armored, mechanical claws
+// Species V: Fortress (磐甲) - Geometric shield plates
 // ============================================================
-class Pincer extends Creature {
+class Fortress extends Creature {
   setupCreature() {
     this.complexityStage = this.complexityStage || 0;
-    this.chains.push(new Chain(10, 8, 20, 5, 0.7)); // body
-    this.chains.push(new Chain(6, 12, 10, 5, 0.85)); // left claw
-    this.chains.push(new Chain(6, 12, 10, 5, 0.85)); // right claw
+    this.props.shieldAngle = 0;
+    this.chains.push(new Chain(8, 10, 18, 6, 0.75)); // core
+    this.chains.push(new Chain(5, 10, 8, 4, 0.85)); // guard 1
+    this.chains.push(new Chain(5, 10, 8, 4, 0.85)); // guard 2
     if (this.complexityStage >= 1) {
-      this.chains.push(new Chain(4, 6, 6, 3, 0.9));
-      this.chains.push(new Chain(4, 6, 6, 3, 0.9));
+      this.chains.push(new Chain(4, 8, 6, 3, 0.9)); // extra guard
+      this.chains.push(new Chain(4, 8, 6, 3, 0.9));
     }
   }
   upgradeComplexity(stage) {
@@ -1011,25 +1064,35 @@ class Pincer extends Creature {
     this.setupCreature();
   }
   updateChains() {
+    this.props.shieldAngle += 0.03 + this.attackPhase * 0.1;
     this.chains[0].update(this.x, this.y);
     const a = this.angle;
-    const spread = 0.3 - this.attackPhase * 0.25;
-    const reach = 70 + this.attackPhase * 30;
+    // Two main guards orbit ahead
+    const orbit = 60 + this.attackPhase * 25;
     if (this.chains.length > 1) {
-      this.chains[1].update(this.x + Math.cos(a - spread) * reach, this.y + Math.sin(a - spread) * reach);
+      this.chains[1].update(
+        this.x + Math.cos(a - 0.4) * orbit,
+        this.y + Math.sin(a - 0.4) * orbit
+      );
     }
     if (this.chains.length > 2) {
-      this.chains[2].update(this.x + Math.cos(a + spread) * reach, this.y + Math.sin(a + spread) * reach);
+      this.chains[2].update(
+        this.x + Math.cos(a + 0.4) * orbit,
+        this.y + Math.sin(a + 0.4) * orbit
+      );
     }
+    // Extra guards orbit wider
     if (this.chains.length > 3) {
-      const sp2 = 0.6 - this.attackPhase * 0.2;
-      const r2 = 50 + this.attackPhase * 20;
-      this.chains[3].update(this.x + Math.cos(a - sp2) * r2, this.y + Math.sin(a - sp2) * r2);
+      this.chains[3].update(
+        this.x + Math.cos(a - 0.8) * (orbit * 0.7),
+        this.y + Math.sin(a - 0.8) * (orbit * 0.7)
+      );
     }
     if (this.chains.length > 4) {
-      const sp2 = 0.6 - this.attackPhase * 0.2;
-      const r2 = 50 + this.attackPhase * 20;
-      this.chains[4].update(this.x + Math.cos(a + sp2) * r2, this.y + Math.sin(a + sp2) * r2);
+      this.chains[4].update(
+        this.x + Math.cos(a + 0.8) * (orbit * 0.7),
+        this.y + Math.sin(a + 0.8) * (orbit * 0.7)
+      );
     }
   }
   draw(ctx) {
@@ -1037,23 +1100,40 @@ class Pincer extends Creature {
     ctx.globalAlpha = this.getStateAlpha();
     ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 15;
     ctx.shadowColor = this.getGlowColor();
-    // Body
-    this.chains[0].draw(ctx, this.getColor(), 4);
-    const segs = this.chains[0].segments;
-    for (let i = 0; i < segs.length; i += 2) {
+    // Core — hexagonal body
+    const coreSegs = this.chains[0].segments;
+    for (let i = 0; i < coreSegs.length; i += 2) {
+      const s = coreSegs[i];
+      const r = s.radius * 0.7;
       ctx.fillStyle = this.getColor();
       ctx.beginPath();
-      ctx.arc(segs[i].x, segs[i].y, segs[i].radius * 0.7, 0, Math.PI * 2);
+      for (let j = 0; j < 6; j++) {
+        const ha = this.props.shieldAngle + j * Math.PI / 3;
+        const px = s.x + Math.cos(ha) * r;
+        const py = s.y + Math.sin(ha) * r;
+        if (j === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
       ctx.fill();
     }
-    // Claws
+    // Guards — shield plate shapes
     for (let c = 1; c < this.chains.length; c++) {
-      this.chains[c].draw(ctx, this.getColor(), 3);
       const tip = this.chains[c].segments[0];
+      const r = 7 + this.attackPhase * 4;
+      // Square/diamond plate
       ctx.fillStyle = this.getColor();
+      ctx.globalAlpha = 0.7 * this.getStateAlpha();
       ctx.beginPath();
-      ctx.arc(tip.x, tip.y, 5 + this.attackPhase * 4, 0, Math.PI * 2);
+      ctx.moveTo(tip.x, tip.y - r);
+      ctx.lineTo(tip.x + r * 0.8, tip.y);
+      ctx.lineTo(tip.x, tip.y + r * 0.6);
+      ctx.lineTo(tip.x - r * 0.8, tip.y);
+      ctx.closePath();
       ctx.fill();
+      ctx.globalAlpha = this.getStateAlpha();
+      // Chain line
+      this.chains[c].draw(ctx, this.getColor(), 2);
     }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
@@ -1061,17 +1141,17 @@ class Pincer extends Creature {
 }
 
 // ============================================================
-// Species VI: Glider (滑翔者) - Manta-ray like wings
+// Species VI: Phantom (幻翼) - Ethereal moth with membranes
 // ============================================================
-class Glider extends Creature {
+class Phantom extends Creature {
   setupCreature() {
     this.complexityStage = this.complexityStage || 0;
-    this.props.wavePhase = 0;
-    this.chains.push(new Chain(25, 8, 0, 0, 0.5)); // spine
-    const wings = Math.min(this.complexityStage + 1, 3);
-    for (let i = 0; i < wings; i++) {
-      this.chains.push(new Chain(20 - i * 2, 8, 0, 0, 0.5)); // left
-      this.chains.push(new Chain(20 - i * 2, 8, 0, 0, 0.5)); // right
+    this.props.wingBeat = 0;
+    this.chains.push(new Chain(20, 7, 0, 0, 0.5)); // spine
+    const wingPairs = Math.min(this.complexityStage + 1, 3);
+    for (let i = 0; i < wingPairs; i++) {
+      this.chains.push(new Chain(16 - i * 2, 7, 0, 0, 0.5));
+      this.chains.push(new Chain(16 - i * 2, 7, 0, 0, 0.5));
     }
   }
   upgradeComplexity(stage) {
@@ -1080,24 +1160,24 @@ class Glider extends Creature {
     this.setupCreature();
   }
   updateChains() {
-    this.props.wavePhase += 0.08;
+    this.props.wingBeat += 0.07;
     this.chains[0].update(this.x, this.y);
-    const wings = Math.min(this.complexityStage + 1, 3);
-    for (let i = 0; i < wings; i++) {
-      const offset = 35 + i * 15;
-      const wave = Math.sin(this.props.wavePhase + i * 0.5) * 15;
+    const wingPairs = Math.min(this.complexityStage + 1, 3);
+    for (let i = 0; i < wingPairs; i++) {
+      const offset = 30 + i * 12;
+      const beat = Math.sin(this.props.wingBeat + i * 0.6) * 18;
       const li = 1 + i * 2;
       const ri = 2 + i * 2;
       if (this.chains[li]) {
         this.chains[li].update(
           this.x + Math.cos(this.angle - Math.PI / 2) * offset,
-          this.y + Math.sin(this.angle - Math.PI / 2) * offset + wave
+          this.y + Math.sin(this.angle - Math.PI / 2) * offset + beat
         );
       }
       if (this.chains[ri]) {
         this.chains[ri].update(
           this.x + Math.cos(this.angle + Math.PI / 2) * offset,
-          this.y + Math.sin(this.angle + Math.PI / 2) * offset + wave
+          this.y + Math.sin(this.angle + Math.PI / 2) * offset + beat
         );
       }
     }
@@ -1107,67 +1187,108 @@ class Glider extends Creature {
     ctx.globalAlpha = this.getStateAlpha();
     ctx.shadowBlur = this.getGlowIntensity();
     ctx.shadowColor = this.getGlowColor();
-    // Wings as filled shapes
-    for (let c = 0; c < this.chains.length; c++) {
-      this.chains[c].draw(ctx, this.getColor(), c === 0 ? 3 : 2);
+    // Wing membranes — translucent filled areas
+    const wingPairs = Math.min(this.complexityStage + 1, 3);
+    for (let i = 0; i < wingPairs; i++) {
+      const li = 1 + i * 2;
+      const ri = 2 + i * 2;
+      for (const ci of [li, ri]) {
+        if (!this.chains[ci]) continue;
+        const wSegs = this.chains[ci].segments;
+        // Membrane from body to wing tip
+        ctx.fillStyle = this.getColor();
+        ctx.globalAlpha = (0.12 - i * 0.02) * this.getStateAlpha();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        for (let j = 0; j < wSegs.length; j++) {
+          ctx.lineTo(wSegs[j].x, wSegs[j].y);
+        }
+        // Return along spine
+        const spineSegs = this.chains[0].segments;
+        const mid = Math.min(8 + i * 3, spineSegs.length - 1);
+        for (let j = mid; j >= 0; j--) {
+          ctx.lineTo(spineSegs[j].x, spineSegs[j].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = this.getStateAlpha();
+        // Wing vein
+        this.chains[ci].draw(ctx, this.getColor(), 1.5);
+      }
     }
-    // Body center
-    ctx.fillStyle = this.getColor();
+    // Spine
+    this.chains[0].draw(ctx, this.getColor(), 2.5);
+    // Head — two small antennae dots
+    const head = this.chains[0].segments[0];
+    ctx.fillStyle = this.getGlowColor();
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+    ctx.arc(head.x, head.y, 4, 0, Math.PI * 2);
     ctx.fill();
+    // Antenna dots
+    const a = this.angle;
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = this.getGlowColor();
+      ctx.globalAlpha = 0.6 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.arc(
+        head.x + Math.cos(a + side * 0.8) * 12,
+        head.y + Math.sin(a + side * 0.8) * 12,
+        2, 0, Math.PI * 2
+      );
+      ctx.fill();
+    }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
 }
 
 // ============================================================
-// Species VII: Hydra (九头蛇) - Multiple independent heads
+// Species VII: Nexus (星联) - Orbital system with satellites
 // ============================================================
-class Hydra extends Creature {
+class Nexus extends Creature {
   setupCreature() {
     this.complexityStage = this.complexityStage || 0;
-    this.props.rotation = 0;
-    this.props.coreSize = 25;
-    this.props.headTargets = [];
-    const heads = Math.min(this.complexityStage + 1, 5);
-    for (let i = 0; i < heads; i++) {
-      this.chains.push(new Chain(18, 8, 14, 4, 0.4));
-      this.props.headTargets.push({ x: 0, y: 0, phase: Math.random() * Math.PI * 2 });
+    this.props.orbitPhase = 0;
+    this.props.coreSize = 22;
+    this.props.nodeTargets = [];
+    const nodes = Math.min(this.complexityStage + 2, 6);
+    for (let i = 0; i < nodes; i++) {
+      this.chains.push(new Chain(14, 7, 10, 3, 0.45));
+      this.props.nodeTargets.push({ x: 0, y: 0, phase: Math.random() * Math.PI * 2 });
     }
     if (this.complexityStage >= 2) {
       const extra = Math.min((this.complexityStage - 1) * 2, 4);
       for (let i = 0; i < extra; i++) {
-        this.chains.push(new Chain(8, 5, 6, 2, 0.6));
+        this.chains.push(new Chain(6, 4, 4, 1, 0.6));
       }
     }
   }
   upgradeComplexity(stage) {
     this.complexityStage = stage;
     this.chains = [];
-    this.props.headTargets = [];
+    this.props.nodeTargets = [];
     this.setupCreature();
   }
   updateChains() {
-    this.props.rotation += 0.02 + this.attackPhase * 0.15;
-    this.centerCollision = { x: this.x, y: this.y, radius: this.props.coreSize + 15 };
-    const headCount = this.props.headTargets.length;
-    for (let i = 0; i < headCount; i++) {
-      const ht = this.props.headTargets[i];
-      ht.phase += 0.02;
-      const ang = this.props.rotation + (Math.PI * 2 / headCount) * i;
-      const reach = 80 + Math.sin(ht.phase) * 20 + this.attackPhase * 30;
-      const tx = this.x + Math.cos(ang) * reach;
-      const ty = this.y + Math.sin(ang) * reach;
-      ht.x += (tx - ht.x) * 0.1;
-      ht.y += (ty - ht.y) * 0.1;
-      this.chains[i].update(ht.x, ht.y);
+    this.props.orbitPhase += 0.025 + this.attackPhase * 0.12;
+    this.centerCollision = { x: this.x, y: this.y, radius: this.props.coreSize + 12 };
+    const nodeCount = this.props.nodeTargets.length;
+    for (let i = 0; i < nodeCount; i++) {
+      const nt = this.props.nodeTargets[i];
+      nt.phase += 0.018;
+      const ang = this.props.orbitPhase + (Math.PI * 2 / nodeCount) * i;
+      const orbit = 70 + Math.sin(nt.phase) * 15 + this.attackPhase * 25;
+      const tx = this.x + Math.cos(ang) * orbit;
+      const ty = this.y + Math.sin(ang) * orbit;
+      nt.x += (tx - nt.x) * 0.12;
+      nt.y += (ty - nt.y) * 0.12;
+      this.chains[i].update(nt.x, nt.y);
     }
-    // Extra tendrils
-    for (let i = headCount; i < this.chains.length; i++) {
-      const ang = this.props.rotation + (Math.PI * 2 / (this.chains.length - headCount)) * (i - headCount) + Math.PI;
-      const reach = 40 + Math.sin(this.timer * 0.05 + i) * 10;
-      this.chains[i].update(this.x + Math.cos(ang) * reach, this.y + Math.sin(ang) * reach);
+    // Extra debris orbits
+    for (let i = nodeCount; i < this.chains.length; i++) {
+      const ang = this.props.orbitPhase * 0.7 + (Math.PI * 2 / (this.chains.length - nodeCount)) * (i - nodeCount) + Math.PI;
+      const r = 35 + Math.sin(this.timer * 0.04 + i) * 8;
+      this.chains[i].update(this.x + Math.cos(ang) * r, this.y + Math.sin(ang) * r);
     }
   }
   draw(ctx) {
@@ -1175,20 +1296,55 @@ class Hydra extends Creature {
     ctx.globalAlpha = this.getStateAlpha();
     ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
     ctx.shadowColor = this.getGlowColor();
-    // Core
+    // Orbit rings (decorative)
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.15 * this.getStateAlpha();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 70, 0, Math.PI * 2);
+    ctx.stroke();
+    if (this.complexityStage >= 1) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = this.getStateAlpha();
+    // Core — star shape
+    const r = this.props.coreSize;
     ctx.fillStyle = this.getColor();
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.props.coreSize, 0, Math.PI * 2);
+    for (let i = 0; i < 8; i++) {
+      const ang = i * Math.PI / 4 + this.props.orbitPhase * 0.5;
+      const rad = i % 2 === 0 ? r : r * 0.6;
+      const px = this.x + Math.cos(ang) * rad;
+      const py = this.y + Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
     ctx.fill();
-    // Heads
+    // Connection beams from core to nodes
+    const nodeCount = this.props.nodeTargets.length;
+    for (let i = 0; i < nodeCount; i++) {
+      const nt = this.props.nodeTargets[i];
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.2 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(nt.x, nt.y);
+      ctx.stroke();
+      ctx.globalAlpha = this.getStateAlpha();
+    }
+    // Satellite nodes + chain tails
     for (let i = 0; i < this.chains.length; i++) {
-      this.chains[i].draw(ctx, this.getColor(), i < this.props.headTargets.length ? 3 : 1.5);
-      // Head tip
-      if (i < this.props.headTargets.length) {
+      this.chains[i].draw(ctx, this.getColor(), i < nodeCount ? 2 : 1);
+      if (i < nodeCount) {
         const tip = this.chains[i].segments[0];
+        // Node — small circle with glow
         ctx.fillStyle = this.getGlowColor();
         ctx.beginPath();
-        ctx.arc(tip.x, tip.y, 6 + this.attackPhase * 4, 0, Math.PI * 2);
+        ctx.arc(tip.x, tip.y, 5 + this.attackPhase * 3, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1198,16 +1354,17 @@ class Hydra extends Creature {
 }
 
 // ============================================================
-// Species VIII: Leviathan (利维坦) - Ultimate, gravity field
+// Species VIII: Titan (泰坦) - Armored worm with dorsal spines
 // ============================================================
-class Leviathan extends Creature {
+class Titan extends Creature {
   setupCreature() {
     this.complexityStage = this.complexityStage || 0;
-    const segs = 18 + this.complexityStage * 3;
-    const dist = 23;
-    const rStart = 28 + this.complexityStage * 2;
-    const rEnd = 6 + this.complexityStage;
-    this.chains.push(new Chain(segs, dist, rStart, rEnd, 0.28));
+    const segs = 20 + this.complexityStage * 3;
+    const dist = 20;
+    const rStart = 26 + this.complexityStage * 2;
+    const rEnd = 8 + this.complexityStage;
+    this.chains.push(new Chain(segs, dist, rStart, rEnd, 0.3));
+    this.props.spinePhase = 0;
   }
   upgradeComplexity(stage) {
     this.complexityStage = stage;
@@ -1215,57 +1372,83 @@ class Leviathan extends Creature {
     this.setupCreature();
   }
   updateChains() {
+    this.props.spinePhase += 0.05;
     this.chains[0].update(this.x, this.y);
   }
   draw(ctx) {
     if (this.isDying) return;
     const chain = this.chains[0];
+    const segs = chain.segments;
     ctx.globalAlpha = this.getStateAlpha();
     ctx.shadowBlur = this.getGlowIntensity() + this.attackPhase * 20;
     ctx.shadowColor = this.getGlowColor();
     // Hunting gravity rings
     if (this.isHunting) {
-      const head = chain.segments[0];
+      const head = segs[0];
       for (let i = 0; i < 3; i++) {
-        const p = ((this.huntTimer % 40) / 40 + i * 0.33) % 1;
-        const r = 40 + p * 80;
-        const a = (1 - p) * 0.4 * this.getStateAlpha();
+        const p = ((this.huntTimer % 45) / 45 + i * 0.33) % 1;
+        const r = 45 + p * 90;
         ctx.strokeStyle = this.getGlowColor();
-        ctx.lineWidth = 4 - i;
-        ctx.globalAlpha = a;
+        ctx.lineWidth = 3 - i;
+        ctx.globalAlpha = (1 - p) * 0.35 * this.getStateAlpha();
         ctx.beginPath();
         ctx.arc(head.x, head.y, r, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.globalAlpha = this.getStateAlpha();
     }
-    // Body
-    ctx.strokeStyle = this.getColor();
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(chain.segments[0].x, chain.segments[0].y);
-    for (let i = 1; i < chain.segments.length; i++) {
-      ctx.lineTo(chain.segments[i].x, chain.segments[i].y);
-    }
-    ctx.stroke();
-    // Segments
-    for (let i = 0; i < chain.segments.length; i++) {
-      const s = chain.segments[i];
-      if (i % 2 === 0 && s.radius > 0) {
-        ctx.fillStyle = this.getColor();
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    // Gravity field aura
-    const head = chain.segments[0];
-    for (let i = 0; i < 6; i++) {
-      const ang = i / 6 * Math.PI * 2 + this.timer * 0.1;
-      const dist = 20 + Math.sin(this.timer * 0.2 + i) * 10 + (this.scale || 1) * 10;
+    // Armored body — wide segments
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (s.radius < 2) continue;
+      const r = s.radius;
+      // Plate — rounded rect approximation via arc
       ctx.fillStyle = this.getColor();
+      ctx.globalAlpha = (i % 2 === 0 ? 0.9 : 0.6) * this.getStateAlpha();
       ctx.beginPath();
-      ctx.arc(head.x + Math.cos(ang) * dist, head.y + Math.sin(ang) * dist, 2, 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // Plate border
+      ctx.strokeStyle = this.getGlowColor();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.3 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = this.getStateAlpha();
+    // Dorsal spines — crystalline protrusions
+    for (let i = 1; i < segs.length - 2; i += 3) {
+      const s = segs[i];
+      const spineLen = s.radius * 1.2 + Math.sin(this.props.spinePhase + i * 0.5) * 3 + this.attackPhase * 6;
+      const ang = (s.angle || 0) + Math.PI / 2;
+      // Top spine — triangular
+      ctx.fillStyle = this.getGlowColor();
+      ctx.globalAlpha = 0.5 * this.getStateAlpha();
+      ctx.beginPath();
+      ctx.moveTo(s.x + Math.cos(ang) * spineLen, s.y + Math.sin(ang) * spineLen);
+      ctx.lineTo(s.x + Math.cos(ang + 0.3) * spineLen * 0.3, s.y + Math.sin(ang + 0.3) * spineLen * 0.3);
+      ctx.lineTo(s.x + Math.cos(ang - 0.3) * spineLen * 0.3, s.y + Math.sin(ang - 0.3) * spineLen * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = this.getStateAlpha();
+    // Head — large with two eye-dots
+    const head = segs[0];
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, head.radius + 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye dots
+    const ha = this.angle;
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = this.getGlowColor();
+      ctx.beginPath();
+      ctx.arc(
+        head.x + Math.cos(ha + side * 0.5) * head.radius * 0.5,
+        head.y + Math.sin(ha + side * 0.5) * head.radius * 0.5,
+        3, 0, Math.PI * 2
+      );
       ctx.fill();
     }
     ctx.shadowBlur = 0;
@@ -1282,7 +1465,7 @@ const CONFIG = {
   INITIAL_AI_COUNTS: { 0: 10, 1: 7, 2: 6, 3: 4, 4: 3, 5: 2, 6: 1, 7: 1 },
   DASH_SPEED: 15,
   DASH_DURATION: 12,
-  DASH_COOLDOWN: 180,      // 3 sec at 60fps
+  DASH_COOLDOWN: 180,
   PARTICLE_CLUSTER_COUNT: 25,
   PARTICLE_CLUSTER_SIZE: 40,
   DANGER_RANGE: 500,
@@ -1291,41 +1474,40 @@ const CONFIG = {
   SAME_LEVEL_ENERGY_STEAL: 0.05,
 };
 
-// Light-theme color palette: saturated, high contrast on light background
+// New creature palette — rich, distinct colors on light background
 const SPECIES = [
-  { name: 'I. Photon (光子)', desc: '微尘级 - 神经质的高频移动', color: '#6a6a6a', glow: '#888',
+  { name: 'I. Ember (烬火)', desc: '微尘级 - 闪烁跃动的火花', color: '#8a6a50', glow: '#b08060',
     speed: 0.05, huntSpeed: 0.055, huntDuration: 120, huntCooldown: 600,
-    skillName: '闪现', skillIcon: '⚡', skillCd: 180, cls: 'Photon' },
-  { name: 'II. Dart (飞梭)', desc: '幼体级 - 僵硬的冲刺与滑行', color: '#0099aa', glow: '#00bbd4',
+    skillName: '闪现', skillIcon: '⚡', skillCd: 180, cls: 'Ember' },
+  { name: 'II. Needle (针鱼)', desc: '幼体级 - 棱晶针体的穿刺', color: '#1a88aa', glow: '#20b0d0',
     speed: 0.04, huntSpeed: 0.055, huntDuration: 120, huntCooldown: 600,
-    skillName: '穿刺', skillIcon: '🗡️', skillCd: 240, cls: 'Dart' },
-  { name: 'III. Pulse (水母)', desc: '腔肠级 - 径向收缩与喷射', color: '#d44060', glow: '#e8507a',
+    skillName: '穿刺', skillIcon: '🗡️', skillCd: 240, cls: 'Needle' },
+  { name: 'III. Bloom (花蕊)', desc: '腔肠级 - 花瓣张合的律动', color: '#c04478', glow: '#e05898',
     speed: 0.035, huntSpeed: 0.045, huntDuration: 120, huntCooldown: 600,
-    skillName: '电击', skillIcon: '⚡', skillCd: 300, cls: 'Pulse' },
-  { name: 'IV. Serpent (蛇刺)', desc: '环节级 - 正弦波游动与倒刺', color: '#1a9a50', glow: '#22b860',
+    skillName: '孢刺', skillIcon: '🌸', skillCd: 300, cls: 'Bloom' },
+  { name: 'IV. Ribbon (绸蛇)', desc: '环节级 - 丝缎般的波浪游动', color: '#2a8855', glow: '#35a868',
     speed: 0.03, huntSpeed: 0.045, huntDuration: 150, huntCooldown: 720,
-    skillName: '疾冲', skillIcon: '💨', skillCd: 300, cls: 'Serpent' },
-  { name: 'V. Pincer (双螯)', desc: '甲壳级 - 重装甲与机械剪切', color: '#d08020', glow: '#e8a020',
+    skillName: '缠绕', skillIcon: '🌀', skillCd: 300, cls: 'Ribbon' },
+  { name: 'V. Fortress (磐甲)', desc: '甲壳级 - 六角盾板的重装护卫', color: '#b87820', glow: '#d89828',
     speed: 0.02, huntSpeed: 0.045, huntDuration: 150, huntCooldown: 840,
-    skillName: '护甲', skillIcon: '🛡️', skillCd: 360, cls: 'Pincer' },
-  { name: 'VI. Glider (滑翔者)', desc: '蝠鲼级 - 优雅的波浪飞行', color: '#5566aa', glow: '#7788cc',
+    skillName: '护甲', skillIcon: '🛡️', skillCd: 360, cls: 'Fortress' },
+  { name: 'VI. Phantom (幻翼)', desc: '蛾翼级 - 半透明翅膜的飘逸', color: '#6058a8', glow: '#8070cc',
     speed: 0.018, huntSpeed: 0.05, huntDuration: 180, huntCooldown: 960,
-    skillName: '声波', skillIcon: '🔊', skillCd: 420, cls: 'Glider' },
-  { name: 'VII. Hydra (九头蛇)', desc: '聚合级 - 多核心独立索敌', color: '#9a30c0', glow: '#b840e0',
+    skillName: '声波', skillIcon: '🔊', skillCd: 420, cls: 'Phantom' },
+  { name: 'VII. Nexus (星联)', desc: '聚合级 - 卫星环绕的轨道体系', color: '#9035b8', glow: '#b048d8',
     speed: 0.015, huntSpeed: 0.05, huntDuration: 180, huntCooldown: 1080,
-    skillName: '分裂', skillIcon: '🧬', skillCd: 480, cls: 'Hydra' },
-  { name: 'VIII. Leviathan (利维坦)', desc: '巨兽级 - 吞噬一切的引力场', color: '#c03030', glow: '#e04040',
+    skillName: '裂变', skillIcon: '💫', skillCd: 480, cls: 'Nexus' },
+  { name: 'VIII. Titan (泰坦)', desc: '巨兽级 - 晶脊铠甲的远古存在', color: '#b83030', glow: '#d84848',
     speed: 0.015, huntSpeed: 0.045, huntDuration: 210, huntCooldown: 1200,
-    skillName: '引力场', skillIcon: '🌀', skillCd: 540, cls: 'Leviathan' },
+    skillName: '引力场', skillIcon: '⚡', skillCd: 540, cls: 'Titan' },
 ];
 
 function stageMaxEnergy(level) {
-  // Smoother curve: 25 * 1.5^level instead of 25 * 2^level
   return Math.floor(CONFIG.BASE_STAGE_ENERGY * Math.pow(1.5, level));
 }
 
 const CLASS_MAP = {
-  Photon, Dart, Pulse, Serpent, Pincer, Glider, Hydra, Leviathan
+  Ember, Needle, Bloom, Ribbon, Fortress, Phantom, Nexus, Titan
 };
 // ============================================================
 // Mustard Seed Enhanced - Main Game Engine
@@ -1462,8 +1644,8 @@ class Game {
   }
 
   _spawnShowcaseCreature() {
-    // Spawn a magenta Glider (manta ray shape) for the title screen
-    const level = 5; // Glider - elegant manta ray with wingspan
+    // Spawn a magenta Phantom (moth) for the title screen
+    const level = 5; // Phantom - ethereal moth with translucent wings
     const spec = {
       ...SPECIES[level],
       color: '#d4207a',   // vibrant magenta
@@ -1677,28 +1859,28 @@ class Game {
     window.AudioMgr.useSkill();
 
     switch (this.playerLevel) {
-      case 0: // Photon - Blink forward
+      case 0: // Ember - Blink forward
         this._skillBlink();
         break;
-      case 1: // Dart - Pierce (speed burst + damage aura)
+      case 1: // Needle - Pierce (speed burst + damage aura)
         this._skillPierce();
         break;
-      case 2: // Pulse - Electric shock AOE
+      case 2: // Bloom - Electric shock AOE
         this._skillShock();
         break;
-      case 3: // Serpent - Speed rush
+      case 3: // Ribbon - Speed rush
         this._skillRush();
         break;
-      case 4: // Pincer - Armor (invuln)
+      case 4: // Fortress - Armor (invuln)
         this._skillArmor();
         break;
-      case 5: // Glider - Sonic wave (push enemies)
+      case 5: // Phantom - Sonic wave (push enemies)
         this._skillSonicWave();
         break;
-      case 6: // Hydra - Temporary split (extra heads)
+      case 6: // Nexus - Temporary split (extra heads)
         this._skillSplit();
         break;
-      case 7: // Leviathan - Gravity pull
+      case 7: // Titan - Gravity pull
         this._skillGravity();
         break;
     }
@@ -1896,6 +2078,10 @@ class Game {
     const spec = SPECIES[this.playerLevel];
     const scale = Math.pow(3, this.playerLevel / 7);
     this.camera.targetZoom = 1 / Math.pow(1.2, this.playerLevel);
+    // Mobile: zoom out more so player can see further on small screens
+    if (window.__isMobile) {
+      this.camera.targetZoom *= 0.55;
+    }
     this.creatures = [];
 
     let count;
@@ -3313,6 +3499,7 @@ window._gameEngine = __game;
 // ============================================================
 // mobile-adapter.js — WeChat iOS (iPhone 16/17) optimization
 // Virtual joystick + touch action buttons + iOS safe area
+// Complete mobile UI redesign
 // ============================================================
 
 (function() {
@@ -3326,7 +3513,7 @@ window._gameEngine = __game;
   // Expose for game engine to check
   window.__isMobile = isMobile;
 
-  if (!isMobile) return; // Desktop — skip all mobile adaptation
+  if (!isMobile) return;
 
   // --- Prevent iOS rubber-banding and pinch zoom ---
   document.addEventListener('touchmove', e => {
@@ -3334,7 +3521,6 @@ window._gameEngine = __game;
     e.preventDefault();
   }, { passive: false });
 
-  // Prevent double-tap zoom on iOS
   let lastTouchEnd = 0;
   document.addEventListener('touchend', e => {
     const now = Date.now();
@@ -3342,13 +3528,13 @@ window._gameEngine = __game;
     lastTouchEnd = now;
   }, { passive: false });
 
-  // --- Update viewport meta for iOS notch + no zoom ---
+  // --- Update viewport meta ---
   let vpMeta = document.querySelector('meta[name="viewport"]');
   if (vpMeta) {
     vpMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
   }
 
-  // --- iOS full-screen-like experience ---
+  // --- Lock body ---
   document.body.style.overscrollBehavior = 'none';
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
@@ -3358,77 +3544,156 @@ window._gameEngine = __game;
   document.body.style.top = '0';
   document.body.style.left = '0';
 
-  // --- Inject mobile CSS ---
+  // --- Inject mobile CSS (complete override) ---
   const css = document.createElement('style');
   css.textContent = `
-    /* ===== iOS safe area ===== */
+    /* =============================================
+       iOS Safe Area Variables
+       ============================================= */
     :root {
-      --sat: env(safe-area-inset-top, 0px);
-      --sab: env(safe-area-inset-bottom, 0px);
+      --sat: env(safe-area-inset-top, 47px);
+      --sab: env(safe-area-inset-bottom, 34px);
       --sal: env(safe-area-inset-left, 0px);
       --sar: env(safe-area-inset-right, 0px);
     }
 
-    /* ===== Mobile HUD shrink ===== */
+    /* =============================================
+       TOP HUD — compact horizontal bar at top
+       ============================================= */
     #ui {
-      top: calc(8px + var(--sat)) !important;
-      left: calc(8px + var(--sal)) !important;
-      width: 200px !important;
+      position: fixed !important;
+      top: calc(var(--sat) + 4px) !important;
+      left: 6px !important;
+      right: 6px !important;
+      width: auto !important;
+      max-width: none !important;
       padding: 8px 12px !important;
-      border-radius: 10px !important;
-      opacity: 0.82;
+      border-radius: 12px !important;
+      background: rgba(255,255,255,0.78) !important;
+      backdrop-filter: blur(10px) !important;
+      z-index: 600;
+      font-size: 11px !important;
     }
-    #ui h1 { font-size: 14px !important; }
-    #ui .desc { font-size: 10px !important; }
-    #ui .stats { font-size: 11px !important; gap: 1px 8px !important; }
-    #energySection { margin-top: 6px !important; padding-top: 6px !important; }
-    #energyBarBg { height: 16px !important; }
-    #energyLabel { font-size: 9px !important; }
-    #energyText { font-size: 9px !important; }
 
-    /* ===== Mobile minimap ===== */
+    /* Species name - single line */
+    #ui h1 {
+      font-size: 13px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      margin: 0 !important;
+      line-height: 1.2 !important;
+    }
+
+    /* Hide description on mobile to save space */
+    #ui .desc { display: none !important; }
+
+    /* Stats grid - single row */
+    #ui .stats {
+      display: flex !important;
+      gap: 8px !important;
+      font-size: 10px !important;
+      margin-top: 4px !important;
+      flex-wrap: nowrap !important;
+      white-space: nowrap !important;
+    }
+    #ui .stats div {
+      flex-shrink: 0;
+    }
+
+    /* Energy section - compact */
+    #energySection {
+      margin-top: 6px !important;
+      padding-top: 6px !important;
+    }
+    #energyLabel { display: none !important; }
+    #energyBarBg {
+      height: 16px !important;
+      border-radius: 8px !important;
+    }
+    #energyBar { border-radius: 7px !important; }
+    #energyText {
+      font-size: 9px !important;
+      white-space: nowrap !important;
+    }
+
+    /* =============================================
+       MINIMAP — small, top-right corner
+       ============================================= */
     #minimap {
-      width: 100px !important; height: 100px !important;
-      bottom: calc(16px + var(--sab)) !important;
-      right: calc(10px + var(--sar)) !important;
-      opacity: 0.7;
+      position: fixed !important;
+      top: calc(var(--sat) + 4px) !important;
+      right: 6px !important;
+      bottom: auto !important;
+      left: auto !important;
+      width: 80px !important;
+      height: 80px !important;
       border-radius: 10px !important;
+      opacity: 0.7 !important;
+      z-index: 610;
     }
 
-    /* Hide desktop skill bar and info */
+    /* =============================================
+       HIDE DESKTOP ELEMENTS
+       ============================================= */
     #skillBar { display: none !important; }
     #info { display: none !important; }
 
-    /* ===== Mobile start screen ===== */
-    #titleEnglish { font-size: 36px !important; letter-spacing: 5px !important; }
-    #titleChinese { font-size: 20px !important; letter-spacing: 10px !important; }
+    /* =============================================
+       START SCREEN — mobile friendly
+       ============================================= */
+    #titleEnglish {
+      font-size: 32px !important;
+      letter-spacing: 4px !important;
+    }
+    #titleChinese {
+      font-size: 18px !important;
+      letter-spacing: 8px !important;
+      margin: 6px 0 20px !important;
+    }
     #startButton {
-      font-size: 16px !important; padding: 12px 40px !important;
+      font-size: 16px !important;
+      padding: 12px 36px !important;
       border-radius: 40px !important;
+      letter-spacing: 3px !important;
     }
 
-    /* ===== Game over panels ===== */
+    /* =============================================
+       GAME OVER / WIN — mobile panels
+       ============================================= */
     .overlay-screen .panel {
-      padding: 24px 24px !important;
+      padding: 28px 24px !important;
       margin: 0 16px !important;
-      max-width: 90vw;
+      max-width: 90vw !important;
+      border-radius: 16px !important;
     }
-    .overlay-screen h2 { font-size: 28px !important; }
-    .overlay-screen .stat-grid { font-size: 13px !important; gap: 4px 16px !important; }
-    .overlay-screen button { font-size: 16px !important; padding: 10px 32px !important; }
+    .overlay-screen h2 { font-size: 28px !important; letter-spacing: 2px !important; }
+    .overlay-screen .stat-grid {
+      font-size: 13px !important;
+      gap: 6px 20px !important;
+      margin: 16px 0 !important;
+    }
+    .overlay-screen button {
+      font-size: 16px !important;
+      padding: 10px 32px !important;
+      margin-top: 20px !important;
+    }
 
-    /* ===== VIRTUAL JOYSTICK ===== */
+    /* =============================================
+       VIRTUAL JOYSTICK
+       ============================================= */
     #joystickZone {
       position: fixed;
-      left: 0; bottom: 0;
-      width: 55vw;
-      height: 55vh;
+      left: 0;
+      bottom: 0;
+      width: 50vw;
+      height: 50vh;
       z-index: 800;
       touch-action: none;
     }
     #joystickBase {
       position: fixed;
-      width: 120px; height: 120px;
+      width: 110px; height: 110px;
       border-radius: 50%;
       background: rgba(42,90,140,0.06);
       border: 2px solid rgba(42,90,140,0.12);
@@ -3438,7 +3703,7 @@ window._gameEngine = __game;
     }
     #joystickThumb {
       position: fixed;
-      width: 46px; height: 46px;
+      width: 44px; height: 44px;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(42,130,180,0.45), rgba(42,130,180,0.2));
       border: 2px solid rgba(42,130,180,0.35);
@@ -3447,21 +3712,23 @@ window._gameEngine = __game;
       transform: translate(-50%, -50%);
     }
 
-    /* ===== ACTION BUTTONS ===== */
+    /* =============================================
+       ACTION BUTTONS — right side, vertically stacked
+       ============================================= */
     #mobileActions {
       position: fixed;
-      right: calc(14px + var(--sar));
-      bottom: calc(150px + var(--sab));
+      right: calc(12px + var(--sar));
+      bottom: calc(var(--sab) + 80px);
       z-index: 800;
       display: none;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       align-items: center;
     }
     #mobileActions.visible { display: flex; }
 
     .mobile-btn {
-      width: 66px; height: 66px;
+      width: 62px; height: 62px;
       border-radius: 50%;
       border: 2px solid rgba(42,90,140,0.25);
       background: rgba(255,255,255,0.6);
@@ -3483,21 +3750,62 @@ window._gameEngine = __game;
       background: rgba(42,130,180,0.2);
       border-color: rgba(42,130,180,0.5);
     }
-    .mobile-btn .btn-icon { font-size: 24px; line-height: 1; }
+    .mobile-btn .btn-icon { font-size: 22px; line-height: 1; }
     .mobile-btn .btn-label {
-      font-size: 9px; color: rgba(40,60,90,0.55); margin-top: 1px;
-      font-family: 'Courier New', monospace; letter-spacing: 0.5px;
+      font-size: 9px; color: rgba(40,60,90,0.5); margin-top: 1px;
+      font-family: 'Courier New', monospace;
     }
-    .mobile-btn.on-cooldown { opacity: 0.45; }
+    .mobile-btn.on-cooldown { opacity: 0.4; }
     .mobile-btn .cd-text {
-      position: absolute; font-size: 15px; font-weight: bold;
+      position: absolute; font-size: 14px; font-weight: bold;
       color: #2a5a8c; display: none;
     }
     .mobile-btn.on-cooldown .cd-text { display: block; }
-    .mobile-btn.on-cooldown .btn-icon { opacity: 0.25; }
-    .mobile-btn.on-cooldown .btn-label { opacity: 0.25; }
+    .mobile-btn.on-cooldown .btn-icon { opacity: 0.2; }
+    .mobile-btn.on-cooldown .btn-label { opacity: 0.2; }
+
+    /* =============================================
+       MOBILE STATUS INDICATOR — bottom center
+       ============================================= */
+    #mobileStatus {
+      position: fixed;
+      bottom: calc(var(--sab) + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 700;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.65);
+      backdrop-filter: blur(6px);
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(42,90,140,0.12);
+      font-size: 11px;
+      color: rgba(40,60,90,0.65);
+      font-family: 'Courier New', monospace;
+      white-space: nowrap;
+    }
+    #mobileStatus.visible { display: flex; }
+    #mobileStatus .danger-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #5a5;
+      flex-shrink: 0;
+    }
+    #mobileStatus .danger-dot.red { background: #c44; }
   `;
   document.head.appendChild(css);
+
+  // --- Rearrange HUD: put minimap top-right, HUD takes left portion ---
+  // We need to make HUD narrower so it doesn't overlap minimap
+  const adjustHUD = () => {
+    const ui = document.getElementById('ui');
+    const mm = document.getElementById('minimap');
+    if (ui && mm) {
+      // HUD only takes left side, leaving room for minimap
+      ui.style.right = '92px';
+    }
+  };
 
   // --- Create joystick DOM ---
   const joystickZone = document.createElement('div');
@@ -3525,6 +3833,15 @@ window._gameEngine = __game;
   `;
   document.body.appendChild(actionsDiv);
 
+  // --- Create bottom status bar ---
+  const statusDiv = document.createElement('div');
+  statusDiv.id = 'mobileStatus';
+  statusDiv.innerHTML = `
+    <span class="danger-dot" id="statusDot"></span>
+    <span id="statusText">安全</span>
+  `;
+  document.body.appendChild(statusDiv);
+
   // ============================
   // Joystick State
   // ============================
@@ -3533,10 +3850,9 @@ window._gameEngine = __game;
     touchId: null,
     baseX: 0, baseY: 0,
     dx: 0, dy: 0,
-    maxRadius: 52
+    maxRadius: 48
   };
 
-  // Expose joystick state globally so game engine can read it
   window.__joystick = jState;
 
   joystickZone.addEventListener('touchstart', e => {
@@ -3615,58 +3931,83 @@ window._gameEngine = __game;
   btnSkill.addEventListener('touchend', () => btnSkill.classList.remove('pressed'));
 
   // ============================
-  // Show/hide mobile actions with game state
+  // Visibility + Cooldown + Status sync
   // ============================
-  function checkVisibility() {
-    const mobileActions = document.getElementById('mobileActions');
+  function mobileUILoop() {
     const engine = window._gameEngine;
+
+    // Show/hide actions + status
+    const mobileActions = document.getElementById('mobileActions');
+    const mobileStatus = document.getElementById('mobileStatus');
     if (engine && engine.gameStarted && !engine.gameOver && !engine.winState) {
       mobileActions.classList.add('visible');
+      mobileStatus.classList.add('visible');
     } else {
       mobileActions.classList.remove('visible');
+      mobileStatus.classList.remove('visible');
     }
-    requestAnimationFrame(checkVisibility);
+
+    // Adjust HUD width to not overlap minimap
+    adjustHUD();
+
+    // Cooldown display
+    if (engine && engine.creatures && engine.creatures.length > 0) {
+      const leader = engine.creatures[0];
+
+      if (leader.dashCooldown > 0) {
+        btnDash.classList.add('on-cooldown');
+        document.getElementById('btnDashCd').textContent = Math.ceil(leader.dashCooldown / 60) + 's';
+      } else {
+        btnDash.classList.remove('on-cooldown');
+      }
+
+      if (leader.skillCooldown > 0) {
+        btnSkill.classList.add('on-cooldown');
+        document.getElementById('btnSkillCd').textContent = Math.ceil(leader.skillCooldown / 60) + 's';
+      } else {
+        btnSkill.classList.remove('on-cooldown');
+      }
+
+      // Status: safe/danger indicator
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      // Check if any predator is nearby
+      let inDanger = false;
+      if (engine.aiCreatures) {
+        const px = leader.x, py = leader.y;
+        const dangerRange = 400 * (leader.scale || 1);
+        for (let i = 0; i < engine.aiCreatures.length; i++) {
+          const ai = engine.aiCreatures[i];
+          if (ai.type > engine.playerLevel) {
+            const dx = ai.x - px, dy = ai.y - py;
+            if (dx * dx + dy * dy < dangerRange * dangerRange) {
+              inDanger = true;
+              break;
+            }
+          }
+        }
+      }
+      if (inDanger) {
+        dot.classList.add('red');
+        text.textContent = '⚠ 危险';
+        text.style.color = '#c44';
+      } else {
+        dot.classList.remove('red');
+        text.textContent = '安全';
+        text.style.color = '';
+      }
+    }
+
+    requestAnimationFrame(mobileUILoop);
   }
-  requestAnimationFrame(checkVisibility);
+  requestAnimationFrame(mobileUILoop);
 
   // ============================
-  // Update cooldown display on buttons
-  // ============================
-  function updateCooldowns() {
-    const engine = window._gameEngine;
-    if (!engine || !engine.creatures || engine.creatures.length === 0) {
-      requestAnimationFrame(updateCooldowns);
-      return;
-    }
-    const leader = engine.creatures[0];
-
-    // Dash
-    if (leader.dashCooldown > 0) {
-      btnDash.classList.add('on-cooldown');
-      document.getElementById('btnDashCd').textContent = Math.ceil(leader.dashCooldown / 60) + 's';
-    } else {
-      btnDash.classList.remove('on-cooldown');
-    }
-
-    // Skill
-    if (leader.skillCooldown > 0) {
-      btnSkill.classList.add('on-cooldown');
-      document.getElementById('btnSkillCd').textContent = Math.ceil(leader.skillCooldown / 60) + 's';
-    } else {
-      btnSkill.classList.remove('on-cooldown');
-    }
-
-    requestAnimationFrame(updateCooldowns);
-  }
-  requestAnimationFrame(updateCooldowns);
-
-  // ============================
-  // WeChat + iOS audio unlock
+  // Audio unlock
   // ============================
   function unlockAudio() {
     if (window.AudioMgr && window.AudioMgr.ctx) {
       window.AudioMgr.ctx.resume().catch(() => {});
-      // Play a tiny silent buffer
       try {
         const ctx = window.AudioMgr.ctx;
         const buf = ctx.createBuffer(1, 1, 22050);
